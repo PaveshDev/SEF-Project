@@ -1,0 +1,38 @@
+# INACTIVE EXAMPLE. Every <...> token below is a placeholder, not a GitHub handle.
+# Leader: replace tokens with real @handles or @organization/teams, then rename
+# this file to CODEOWNERS. Configure available GitHub branch protection/rulesets
+# and required reviews separately. CODEOWNERS alone does not restrict merging.
+
+* <LEADER_GITHUB_HANDLE>
+
+/frontend/src/modules/items/ <MEMBER_1_GITHUB_HANDLE>
+/backend/src/WasteToValue.Api/Modules/Items/ <MEMBER_1_GITHUB_HANDLE>
+/backend/tests/Items/ <MEMBER_1_GITHUB_HANDLE>
+/mobile/lib/features/items/ <MEMBER_1_GITHUB_HANDLE>
+/mobile/test/items/ <MEMBER_1_GITHUB_HANDLE>
+/agents/items/ <MEMBER_1_GITHUB_HANDLE>
+/docs/members/member-1/ <MEMBER_1_GITHUB_HANDLE>
+
+/frontend/src/modules/recovery/ <MEMBER_2_GITHUB_HANDLE>
+/backend/src/WasteToValue.Api/Modules/Recovery/ <MEMBER_2_GITHUB_HANDLE>
+/backend/tests/Recovery/ <MEMBER_2_GITHUB_HANDLE>
+/mobile/lib/features/recovery/ <MEMBER_2_GITHUB_HANDLE>
+/mobile/test/recovery/ <MEMBER_2_GITHUB_HANDLE>
+/agents/recovery/ <MEMBER_2_GITHUB_HANDLE>
+/docs/members/member-2/ <MEMBER_2_GITHUB_HANDLE>
+
+/frontend/src/modules/partners/ <MEMBER_3_GITHUB_HANDLE>
+/backend/src/WasteToValue.Api/Modules/Partners/ <MEMBER_3_GITHUB_HANDLE>
+/backend/tests/Partners/ <MEMBER_3_GITHUB_HANDLE>
+/mobile/lib/features/partners/ <MEMBER_3_GITHUB_HANDLE>
+/mobile/test/partners/ <MEMBER_3_GITHUB_HANDLE>
+/agents/partners/ <MEMBER_3_GITHUB_HANDLE>
+/docs/members/member-3/ <MEMBER_3_GITHUB_HANDLE>
+
+/frontend/src/modules/collections/ <MEMBER_4_GITHUB_HANDLE>
+/backend/src/WasteToValue.Api/Modules/Collections/ <MEMBER_4_GITHUB_HANDLE>
+/backend/tests/Collections/ <MEMBER_4_GITHUB_HANDLE>
+/mobile/lib/features/collections/ <MEMBER_4_GITHUB_HANDLE>
+/mobile/test/collections/ <MEMBER_4_GITHUB_HANDLE>
+/agents/collections/ <MEMBER_4_GITHUB_HANDLE>
+/docs/members/member-4/ <MEMBER_4_GITHUB_HANDLE>

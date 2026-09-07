@@ -1,0 +1,27 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{12344378-7DFC-4B6D-A864-503DFB805BFA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WasteToValue.Api", "src\WasteToValue.Api\WasteToValue.Api.csproj", "{1B269829-7F8A-4C6E-8350-2002C6EB34BA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1B269829-7F8A-4C6E-8350-2002C6EB34BA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1B269829-7F8A-4C6E-8350-2002C6EB34BA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1B269829-7F8A-4C6E-8350-2002C6EB34BA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1B269829-7F8A-4C6E-8350-2002C6EB34BA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{1B269829-7F8A-4C6E-8350-2002C6EB34BA} = {12344378-7DFC-4B6D-A864-503DFB805BFA}
+	EndGlobalSection
+EndGlobal

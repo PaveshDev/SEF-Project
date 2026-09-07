@@ -1,0 +1,51 @@
+# Local configuration and secrets; sanitized examples are tracked.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+*.cer
+*.jks
+*.keystore
+key.properties
+secrets.json
+appsettings.Local.json
+appsettings.*.local.json
+
+# Dependencies, compilation, coverage, and generated caches.
+node_modules/
+dist/
+build/
+bin/
+obj/
+.dart_tool/
+.pub-cache/
+.pub/
+.flutter-plugins
+.flutter-plugins-dependencies
+.gradle/
+Pods/
+coverage/
+TestResults/
+
+# IDE/machine state and local output.
+.vs/
+.idea/
+*.iml
+*.user
+*.suo
+*.swp
+.DS_Store
+Thumbs.db
+local.properties
+*.log
+logs/
+uploads/
+upload-data/
+.artifacts/
+.playwright-mcp/
+
+# Keep package-lock.json, packages.lock.json, and pubspec.lock tracked.
