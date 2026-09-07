@@ -5,7 +5,7 @@ using WasteToValue.Api.Modules.Recovery.Interfaces;
 namespace WasteToValue.Api.Modules.Recovery.Controllers;
 
 [ApiController]
-[Route("api/recovery/cases")]
+[Route("api/recovery-cases")]
 [ServiceFilter(typeof(RecoveryExceptionFilter))]
 public sealed class RecoveryCasesController(IRecoveryPlanningService planning, IProposalDecisionService proposals) : ControllerBase
 {
@@ -18,15 +18,24 @@ public sealed class RecoveryCasesController(IRecoveryPlanningService planning, I
     }
 
     [HttpGet]
-    public Task<IReadOnlyList<RecoveryCaseResponse>> List(CancellationToken ct) => planning.ListAsync(ct);
+    public Task<PagedResponse<RecoveryCaseResponse>> List([FromQuery] RecoveryCaseQuery query, CancellationToken ct) => planning.ListAsync(query, ct);
     [HttpGet("{caseId:guid}")]
     public Task<RecoveryCaseResponse> Get(Guid caseId, CancellationToken ct) => planning.GetAsync(caseId, ct);
-    [HttpPut("{caseId:guid}/inputs")]
+    [HttpPut("{caseId:guid}")]
     public Task<RecoveryCaseResponse> Update(Guid caseId, UpdateRecoveryInputsRequest request,
         [FromHeader(Name = "Idempotency-Key")] string key, CancellationToken ct) => planning.UpdateInputsAsync(caseId, request, key, ct);
-    [HttpPost("{caseId:guid}/planning")]
+    [HttpDelete("{caseId:guid}")]
+    public async Task<IActionResult> Delete(Guid caseId, [FromHeader(Name = "Idempotency-Key")] string key, CancellationToken ct)
+    {
+        await planning.DeleteAsync(caseId, key, ct);
+        return NoContent();
+    }
+    [HttpPost("{caseId:guid}/plan")]
     public Task<PlanningResponse> Plan(Guid caseId, StartPlanningRequest request,
         [FromHeader(Name = "Idempotency-Key")] string key, CancellationToken ct) => planning.PlanAsync(caseId, request, key, ct);
+    [HttpPost("{caseId:guid}/replan")]
+    public Task<PlanningResponse> Replan(Guid caseId, StartPlanningRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string key, CancellationToken ct) => planning.ReplanAsync(caseId, request, key, ct);
     [HttpGet("{caseId:guid}/options")]
     public Task<IReadOnlyList<RecoveryOptionResponse>> Options(Guid caseId, CancellationToken ct) => planning.OptionsAsync(caseId, ct);
     [HttpPost("{caseId:guid}/proposals")]

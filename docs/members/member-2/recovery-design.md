@@ -16,6 +16,14 @@ The conservative financial calculation is:
 
 Responses include both net value and shortfall, plus the original low/high range. Donation can have a zero monetary return and a positive shortfall; no loss is silently hidden. No currency conversion is performed.
 
+Phase 3 adds the authoritative deterministic valuation result through `ValueEstimationService.Evaluate`.
+It uses `EstimatedProceeds - EstimatedRepairCost - EstimatedPickupCost`, rounds monetary inputs and
+results to two decimals with `MidpointRounding.AwayFromZero`, and returns the complete input contract,
+formula version, source name, observed timestamp, stale-reference flag, warnings, and separate social and
+environmental benefit lists. The default maximum reference age is 30 days and is supplied through
+`ValueEstimationOptions`; donation proceeds are forced to zero and never fabricated from a value reference.
+The engine is deterministic and does not accept LLM-generated prices as authoritative inputs.
+
 ## Planning behavior
 
 Only a verified human owner creates a case, using a current confirmed assessment. The case pins assessment/item versions. Active uniqueness is checked by the service and represented by a partial unique database index, including Approved cases.
@@ -44,20 +52,23 @@ All paths are prefixed by `/api/recovery`.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | /cases | Create owned case |
-| GET | /cases | Latest 100 owned cases |
-| GET | /cases/{caseId} | Owned case |
-| PUT | /cases/{caseId}/inputs | Replace draft/revision-requested inputs |
-| POST | /cases/{caseId}/planning | Plan or retry awaiting/failed planning |
-| GET | /cases/{caseId}/options | Options for current case revision |
-| POST | /cases/{caseId}/proposals | Submit an exact validated option |
-| POST | /cases/{caseId}/cancel | Pre-approval cancellation |
-| GET | /proposals/{proposalId} | Owned proposal |
-| POST | /proposals/{proposalId}/decisions | Human owner decision |
-| POST | /proposals/{proposalId}/refresh | Explicit stale/expiry reconciliation |
-| GET | /value-references | Verified references, or curator-visible references |
-| POST | /value-references | Human curator creates reference |
-| POST | /value-references/{referenceId}/verify | Human curator verifies reference |
+| POST | /api/recovery-cases | Create owned case |
+| GET | /api/recovery-cases | Search/filter/sort/paginate owned cases |
+| GET | /api/recovery-cases/{caseId} | Owned case |
+| PUT | /api/recovery-cases/{caseId} | Replace draft/revision-requested inputs |
+| DELETE | /api/recovery-cases/{caseId} | Delete eligible cases without proposal history |
+| POST | /api/recovery-cases/{caseId}/plan | Plan a case |
+| POST | /api/recovery-cases/{caseId}/replan | Retry planning |
+| GET | /api/recovery-cases/{caseId}/options | Options for current case revision |
+| GET | /api/recovery-proposals/{proposalId} | Owned proposal |
+| POST | /api/recovery-proposals/{proposalId}/decisions | Human owner decision |
+| POST | /api/recovery-proposals/{proposalId}/refresh | Explicit stale/expiry reconciliation |
+| GET | /api/value-references | Search/filter/sort/paginate references |
+| POST | /api/value-references | Human curator creates reference |
+| GET | /api/value-references/{referenceId} | Read a reference visible to the actor |
+| PUT | /api/value-references/{referenceId} | Update an unverified reference |
+| DELETE | /api/value-references/{referenceId} | Delete an unverified reference |
+| POST | /api/value-references/{referenceId}/verify | Human curator verifies reference |
 
 Mutations require an Idempotency-Key header. Edits and decisions carry expected versions; decisions also carry proposal revision. Monetary totals, statuses, owner IDs, and curator verification are not caller-controlled fields.
 

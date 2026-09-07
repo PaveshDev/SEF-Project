@@ -14,19 +14,33 @@ internal sealed class TestRepository : IRecoveryRepository
     public List<ProposalDecision> Decisions = new();
     public List<ValueReference> References = new();
     public Task<RecoveryCase?> FindCaseAsync(Guid id, CancellationToken ct) => Task.FromResult(Cases.SingleOrDefault(x => x.Id == id));
-    public Task<IReadOnlyList<RecoveryCase>> ListCasesAsync(Guid ownerId, CancellationToken ct) => Task.FromResult<IReadOnlyList<RecoveryCase>>(Cases.Where(x => x.OwnerId == ownerId).ToArray());
+    public Task<PagedResult<RecoveryCase>> ListCasesAsync(Guid ownerId, RecoveryCaseQuery query, CancellationToken ct)
+    {
+        var items = Cases.Where(x => x.OwnerId == ownerId && (query.Status is null || x.Status == query.Status) &&
+            (string.IsNullOrWhiteSpace(query.Search) || x.Objective.Contains(query.Search))).ToArray();
+        return Task.FromResult(new PagedResult<RecoveryCase>(items.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToArray(), query.Page, query.PageSize, items.Length));
+    }
     public Task<bool> HasActiveCaseAsync(Guid itemId, Guid? exceptId, CancellationToken ct) => Task.FromResult(Cases.Any(x => x.ItemId == itemId && x.Id != exceptId && x.IsActive));
     public Task<IReadOnlyList<RecoveryOption>> ListOptionsAsync(Guid caseId, CancellationToken ct) => Task.FromResult<IReadOnlyList<RecoveryOption>>(Options.Where(x => x.RecoveryCaseId == caseId).ToArray());
     public Task<RecoveryOption?> FindOptionAsync(Guid id, CancellationToken ct) => Task.FromResult(Options.SingleOrDefault(x => x.Id == id));
     public Task<RecoveryProposal?> FindProposalAsync(Guid id, CancellationToken ct) => Task.FromResult(Proposals.SingleOrDefault(x => x.Id == id));
     public Task<IReadOnlyList<RecoveryProposal>> ListProposalsAsync(Guid caseId, CancellationToken ct) => Task.FromResult<IReadOnlyList<RecoveryProposal>>(Proposals.Where(x => x.RecoveryCaseId == caseId).ToArray());
-    public Task<IReadOnlyList<ValueReference>> ListReferencesAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<ValueReference>>(References.ToArray());
+    public Task<PagedResult<ValueReference>> ListReferencesAsync(ValueReferenceQuery query, bool includeUnverified, CancellationToken ct)
+    {
+        var items = References.Where(x => (includeUnverified || x.IsVerified) && (query.Condition is null || x.Condition == query.Condition) &&
+            (query.Route is null || x.Route == query.Route) && (query.Currency is null || x.Currency == query.Currency) &&
+            (string.IsNullOrWhiteSpace(query.Search) || x.SourceName.Contains(query.Search))).ToArray();
+        return Task.FromResult(new PagedResult<ValueReference>(items.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToArray(), query.Page, query.PageSize, items.Length));
+    }
     public Task<ValueReference?> FindReferenceAsync(Guid id, CancellationToken ct) => Task.FromResult(References.SingleOrDefault(x => x.Id == id));
     public void Add(RecoveryCase value) { Check.AssignId(value); Cases.Add(value); }
     public void Add(RecoveryOption value) { Check.AssignId(value); Options.Add(value); }
     public void Add(RecoveryProposal value) { Check.AssignId(value); Proposals.Add(value); }
     public void Add(ProposalDecision value) { Check.AssignId(value); Decisions.Add(value); }
     public void Add(ValueReference value) { Check.AssignId(value); References.Add(value); }
+    public void Remove(RecoveryCase value) => Cases.Remove(value);
+    public void Remove(ValueReference value) => References.Remove(value);
+    public Task<bool> HasProposalsAsync(Guid caseId, CancellationToken ct) => Task.FromResult(Proposals.Any(x => x.RecoveryCaseId == caseId));
     public Task SaveAsync(CancellationToken ct) { ct.ThrowIfCancellationRequested(); return Task.CompletedTask; }
 }
 internal sealed class TestActor : IRecoveryActorAccessor

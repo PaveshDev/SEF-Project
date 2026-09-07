@@ -5,7 +5,7 @@ using WasteToValue.Api.Modules.Recovery.Interfaces;
 namespace WasteToValue.Api.Modules.Recovery.Controllers;
 
 [ApiController]
-[Route("api/recovery/proposals")]
+[Route("api/recovery-proposals")]
 [ServiceFilter(typeof(RecoveryExceptionFilter))]
 public sealed class RecoveryProposalsController(IProposalDecisionService proposals) : ControllerBase
 {

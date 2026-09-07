@@ -79,7 +79,7 @@ public class RecoveryPlanningServiceTests
         cancellation.Cancel();
 
         var exception = await Assert.ThrowsAsync<OperationCanceledException>(async () =>
-            await empty.Planning.ListAsync(cancellation.Token));
+            await empty.Planning.ListAsync(new RecoveryCaseQuery(null, null), cancellation.Token));
 
         Assert.True(exception is OperationCanceledException);
     }

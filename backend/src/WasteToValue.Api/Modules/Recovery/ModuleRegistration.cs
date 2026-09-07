@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using WasteToValue.Api.Modules.Recovery.DTOs;
 using WasteToValue.Api.Modules.Recovery.Controllers;
 using WasteToValue.Api.Modules.Recovery.Interfaces;
 using WasteToValue.Api.Modules.Recovery.Services;
@@ -19,6 +20,7 @@ public static class ModuleRegistration
         services.TryAddScoped<IRecoveryRepository, EfRecoveryRepository>();
         services.TryAddScoped<RecoveryAccess>();
         services.TryAddScoped<IValueEstimationService, ValueEstimationService>();
+        services.TryAddSingleton(new ValueEstimationOptions(TimeSpan.FromDays(30)));
         services.TryAddScoped<IRecoveryPlanningService, RecoveryPlanningService>();
         services.TryAddScoped<IProposalDecisionService, ProposalDecisionService>();
         services.TryAddScoped<ValueReferenceService>();

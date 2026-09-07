@@ -16,3 +16,11 @@ public sealed record CreateValueReferenceRequest(Guid CategoryId, ConditionGrade
     RecoveryRoute Route, decimal ValueLow, decimal ValueHigh, string Currency,
     string SourceName, string? SourceReference, DateTimeOffset ObservedAt);
 public sealed record VerifyValueReferenceRequest(int ExpectedVersion);
+public sealed record UpdateValueReferenceRequest(int ExpectedVersion, ConditionGrade Condition,
+    RecoveryRoute Route, decimal ValueLow, decimal ValueHigh, string Currency,
+    string SourceName, string? SourceReference, DateTimeOffset ObservedAt);
+public sealed record RecoveryCaseQuery(string? Search, RecoveryCaseStatus? Status,
+    string? SortBy = "createdAt", string? SortDirection = "desc", int Page = 1, int PageSize = 25);
+public sealed record ValueReferenceQuery(string? Search, ConditionGrade? Condition,
+    RecoveryRoute? Route, string? Currency, string? SortBy = "observedAt",
+    string? SortDirection = "desc", int Page = 1, int PageSize = 25);

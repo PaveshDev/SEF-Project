@@ -65,5 +65,24 @@ public sealed class ValueReference
         Touch(now);
     }
 
+    public void Update(int expectedVersion, UpdateValueReferenceRequest request, DateTimeOffset now)
+    {
+        RequireVersion(expectedVersion);
+        if (IsVerified) throw RecoveryException.Conflict("verified_reference_immutable", "Verified value references cannot be edited.");
+        RecoveryRequestValidator.Defined(request.Condition);
+        RecoveryRequestValidator.Defined(request.Route);
+        RecoveryRequestValidator.Money(request.ValueLow);
+        RecoveryRequestValidator.Money(request.ValueHigh);
+        if (request.ValueLow > request.ValueHigh) throw RecoveryException.Invalid("Minimum value must not exceed maximum value.");
+        RecoveryRequestValidator.Currency(request.Currency);
+        RecoveryRequestValidator.Text(request.SourceName, "SourceName", 200);
+        if (request.SourceReference?.Length > 1000) throw RecoveryException.Invalid("SourceReference is too long.");
+        if (request.ObservedAt == default || request.ObservedAt > now) throw RecoveryException.Invalid("ObservedAt must be a known past or current timestamp.");
+        Condition = request.Condition; Route = request.Route; ValueLow = request.ValueLow; ValueHigh = request.ValueHigh;
+        Currency = request.Currency; SourceName = request.SourceName.Trim(); SourceReference = request.SourceReference;
+        ObservedAt = request.ObservedAt.ToUniversalTime();
+        Touch(now);
+    }
+
     public ValueEvidence Snapshot() => new(Id, Version, ObservedAt, ValueLow, ValueHigh, Currency, SourceName);
 }
