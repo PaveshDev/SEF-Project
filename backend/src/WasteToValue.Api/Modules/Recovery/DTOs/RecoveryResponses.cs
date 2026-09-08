@@ -19,12 +19,14 @@ public sealed record RecoveryCaseResponse(Guid Id, Guid ItemId, int Revision, in
 
 public sealed record RecoveryOptionResponse(Guid Id, int CaseRevision, int Version, RecoveryRoute Route,
     bool RequiresPartner, bool RequiresPickup, RecoveryOptionStatus Status, ValueEstimate? Estimate,
-    IReadOnlyList<ValueEvidence> Evidence, OptionIntegrationSnapshot Integration)
+    IReadOnlyList<ValueEvidence> Evidence, IReadOnlyList<string> NonFinancialBenefits,
+    OptionIntegrationSnapshot Integration)
 {
     public static RecoveryOptionResponse From(RecoveryOption value) => new(value.Id, value.CaseRevision,
         value.Version, value.Route, value.RequiresPartner, value.RequiresPickup, value.Status,
         value.Status is RecoveryOptionStatus.Validated or RecoveryOptionStatus.Selected ? value.Estimate() : null,
         JsonSerializer.Deserialize<ValueEvidence[]>(value.EvidenceJson)!,
+        JsonSerializer.Deserialize<string[]>(value.NonFinancialBenefitsJson)!,
         JsonSerializer.Deserialize<OptionIntegrationSnapshot>(value.IntegrationSnapshotJson)!);
 }
 

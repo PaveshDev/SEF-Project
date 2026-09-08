@@ -8,7 +8,7 @@ using Xunit;
 
 namespace WasteToValue.Recovery.Tests.Contracts;
 
-public sealed class RecoveryPlannerAgentTests
+public sealed partial class RecoveryPlannerAgentTests
 {
     [Fact]
     public async Task Golden_reuse_workflow_creates_versioned_draft_and_pauses_for_approval()
@@ -376,9 +376,10 @@ public sealed class RecoveryPlannerAgentTests
 
     private static RecoveryPlannerAgent CreateAgent(PlannerTools tools,
         RecoveryPlannerRuntimeOptions? options = null, IRecoveryWorkflowStore? workflows = null,
-        IRecoveryActorAccessor? actors = null, IRecoveryCommandExecutor? commands = null) =>
+        IRecoveryActorAccessor? actors = null, IRecoveryCommandExecutor? commands = null,
+        IRecoveryReasoningProvider? reasoning = null) =>
         new(new RecoveryPlannerToolset(tools, new ValueEstimationService()), options,
-            new FixedTimeProvider(new DateTimeOffset(2026, 9, 8, 10, 0, 0, TimeSpan.Zero)), workflows, actors, commands);
+            new FixedTimeProvider(DateTimeOffset.UtcNow.AddMinutes(1)), workflows, actors, commands, reasoning);
 
     private static RecoveryWorkflowState StoredWorkflow(Guid workflowId, Guid proposalId,
         int proposalRevision, DateTimeOffset proposalExpiresAt) => new(workflowId, Guid.NewGuid(),

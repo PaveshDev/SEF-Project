@@ -26,6 +26,21 @@ public static class ModuleRegistration
         services.TryAddScoped<ValueReferenceService>();
         services.TryAddScoped<RecoveryAgentOutputValidator>();
         services.TryAddScoped<RecoveryExceptionFilter>();
+        services.TryAddSingleton<RecoveryReasoningValidator>();
+        services.AddHttpClient(GeminiRecoveryReasoningProvider.HttpClientName,
+                client => client.Timeout = Timeout.InfiniteTimeSpan)
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false })
+            .RemoveAllLoggers();
+        services.TryAddScoped<IRecoveryReasoningProvider>(provider =>
+        {
+            var configuration = provider.GetService<IConfiguration>();
+            var settings = configuration is null ? null : GeminiRecoveryReasoningOptions.FromConfiguration(configuration);
+            return settings is null
+                ? new UnavailableRecoveryReasoningProvider()
+                : new GeminiRecoveryReasoningProvider(provider.GetRequiredService<IHttpClientFactory>()
+                    .CreateClient(GeminiRecoveryReasoningProvider.HttpClientName), settings,
+                    provider.GetRequiredService<RecoveryReasoningValidator>());
+        });
         return services;
     }
 }

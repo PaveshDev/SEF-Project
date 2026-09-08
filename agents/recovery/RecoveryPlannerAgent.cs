@@ -1,5 +1,6 @@
 using WasteToValue.Api.Modules.Recovery.DTOs;
 using WasteToValue.Api.Modules.Recovery.DTOs.Integration;
+using WasteToValue.Api.Modules.Recovery.DTOs.Reasoning;
 using WasteToValue.Api.Modules.Recovery.Services;
 using WasteToValue.Api.Modules.Recovery.Interfaces;
 using WasteToValue.Api.Modules.Recovery.Validators;
@@ -39,15 +40,24 @@ public sealed record RecoveryPlannerPersistedOption(Guid Id, Guid RecoveryCaseId
     RecoveryRoute Route, decimal EstimatedNetValue, string Currency, int Version);
 
 public sealed record RecoveryPlannerProposalDraft(Guid RecoveryCaseId, int CaseRevision,
-    IReadOnlyList<RecoveryPlannerAlternative> Alternatives, DateTimeOffset ExpiresAt);
+    IReadOnlyList<RecoveryPlannerAlternative> Alternatives, DateTimeOffset ExpiresAt)
+{
+    public RecoveryReasoningResponse? Recommendation { get; init; }
+}
 
 public sealed record RecoveryPlannerExecutionSummary(Guid RecoveryCaseId, Guid RunId,
     RecoveryPlannerWorkflowState State, IReadOnlyList<RecoveryPlannerToolName> ToolsUsed,
-    IReadOnlyList<string> Warnings, DateTimeOffset StartedAt, DateTimeOffset CompletedAt);
+    IReadOnlyList<string> Warnings, DateTimeOffset StartedAt, DateTimeOffset CompletedAt)
+{
+    public IReadOnlyList<RecoveryPlannerError> IntegrationFailures { get; init; } = Array.Empty<RecoveryPlannerError>();
+}
 
 public sealed record RecoveryPlannerAgentResult(RecoveryPlannerWorkflowState State,
     IReadOnlyList<RecoveryPlannerAlternative> Alternatives, Guid? ProposalId,
-    RecoveryPlannerExecutionSummary Summary, RecoveryPlannerError? Error);
+    RecoveryPlannerExecutionSummary Summary, RecoveryPlannerError? Error)
+{
+    public RecoveryReasoningResponse? Recommendation { get; init; }
+}
 
 public sealed record RecoveryPlannerError(string Code, string Message, bool Retryable,
     RecoveryPlannerToolName? Tool = null);
@@ -139,13 +149,15 @@ public static class RecoveryPlannerInputValidator
 
 public sealed class RecoveryPlannerAgent(RecoveryPlannerToolset tools, RecoveryPlannerRuntimeOptions? options = null,
     TimeProvider? clock = null, IRecoveryWorkflowStore? workflows = null,
-    IRecoveryActorAccessor? actors = null, IRecoveryCommandExecutor? commands = null)
+    IRecoveryActorAccessor? actors = null, IRecoveryCommandExecutor? commands = null,
+    IRecoveryReasoningProvider? reasoning = null)
 {
     private readonly RecoveryPlannerRuntimeOptions runtime = options ?? RecoveryPlannerRuntimeOptions.Default;
     private readonly TimeProvider time = clock ?? TimeProvider.System;
     private readonly IRecoveryWorkflowStore? workflows = workflows;
     private readonly IRecoveryActorAccessor? actors = actors;
     private readonly IRecoveryCommandExecutor? commands = commands;
+    private readonly IRecoveryReasoningProvider reasoning = reasoning ?? new UnavailableRecoveryReasoningProvider();
 
     public async Task<RecoveryPlannerAgentResult> RunAsync(RecoveryPlannerAgentInput input,
         int caseRevision, Guid runId, CancellationToken cancellationToken)
@@ -153,8 +165,33 @@ public sealed class RecoveryPlannerAgent(RecoveryPlannerToolset tools, RecoveryP
         var started = time.GetUtcNow();
         var used = new List<RecoveryPlannerToolName>();
         var warnings = new List<string>();
+        var integrationFailures = new List<RecoveryPlannerError>();
+        var workflowCreated = false;
+        async Task<RecoveryPlannerAgentResult> Fail(RecoveryPlannerError error)
+        {
+            if (workflowCreated)
+            {
+                // Failure finalization must still run when the caller cancels.
+                using var cleanup = new CancellationTokenSource(runtime.ToolTimeout);
+                try
+                {
+                    var recorded = await workflows!.RecordSafeFailureAsync(runId,
+                        new(error.Code, error.Message, error.Tool, time.GetUtcNow()), cleanup.Token)
+                        .WaitAsync(cleanup.Token);
+                    if (!recorded.IsSuccess)
+                        error = new("workflow_state_unavailable", "Workflow failure could not be persisted; reconciliation is required.", true);
+                }
+                catch (Exception)
+                {
+                    error = new("workflow_state_unavailable", "Workflow failure could not be persisted; reconciliation is required.", true);
+                }
+            }
+            var failed = Failure(input, runId, started, used, warnings, error);
+            return failed with { Summary = failed.Summary with { IntegrationFailures = integrationFailures.ToArray() } };
+        }
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             RecoveryPlannerInputValidator.Validate(input);
             if (workflows is not null)
             {
@@ -165,17 +202,18 @@ public sealed class RecoveryPlannerAgent(RecoveryPlannerToolset tools, RecoveryP
                     new Dictionary<RecoveryPlannerToolName, int>(), RecoveryWorkflowApprovalStatus.NotRequested,
                     null, null, null, Array.Empty<RecoveryWorkflowErrorSummary>(), null, started, started, 1), cancellationToken);
                 if (!created.IsSuccess) return Failure(input, runId, started, used, warnings, created.Error!);
+                workflowCreated = true;
             }
             var invoker = new RecoveryPlannerToolInvoker(tools, runtime);
             var assessment = await Call(invoker, RecoveryPlannerToolName.GetConfirmedAssessment,
                 (t, ct) => t.GetConfirmedAssessmentAsync(input.RecoveryCaseId, ct), used, cancellationToken);
             if (!assessment.IsSuccess || !assessment.Value!.IsCurrent ||
                 assessment.Value.Status != AssessmentStatus.Confirmed)
-                return Failure(input, runId, started, used, warnings, assessment.Error ?? new("assessment_stale", "Confirmed assessment is stale or does not match.", false, RecoveryPlannerToolName.GetConfirmedAssessment));
+                return await Fail(assessment.Error ?? new("assessment_stale", "Confirmed assessment is stale or does not match.", false, RecoveryPlannerToolName.GetConfirmedAssessment));
 
             var references = await Call(invoker, RecoveryPlannerToolName.GetValueReferences,
                 (t, ct) => t.GetValueReferencesAsync(input.RecoveryCaseId, ct), used, cancellationToken);
-            if (!references.IsSuccess) return Failure(input, runId, started, used, warnings, references.Error!);
+            if (!references.IsSuccess) return await Fail(references.Error!);
 
             var alternatives = new List<RecoveryPlannerAlternative>();
             foreach (var route in input.PreferredRoutes)
@@ -191,12 +229,12 @@ public sealed class RecoveryPlannerAgent(RecoveryPlannerToolset tools, RecoveryP
                 alternatives.Add(new(route, new[] { reference.ReferenceId }, valuation.Value!, null, null));
             }
 
-                if (alternatives.Count == 0)
-                return Failure(input, runId, started, used, warnings, new("no_feasible_alternatives", "No feasible Recovery alternatives were produced.", false));
+            if (alternatives.Count == 0)
+                return await Fail(new("no_feasible_alternatives", "No feasible Recovery alternatives were produced.", false));
             var saved = await Call(invoker, RecoveryPlannerToolName.SaveRecoveryOptions,
                 (t, ct) => t.SaveRecoveryOptionsAsync(runId, alternatives.Select(x => new RecoveryPlannerOptionDraft(input.RecoveryCaseId,
                     x.Route, x.Valuation.EstimatedNetValue, x.Valuation.Currency, x.ReferenceIds)).ToArray(), ct), used, cancellationToken);
-            if (!saved.IsSuccess) return Failure(input, runId, started, used, warnings, saved.Error!);
+            if (!saved.IsSuccess) return await Fail(saved.Error!);
             var persisted = ValidatePersistedOptions(input.RecoveryCaseId, alternatives, saved.Value!);
             var persistedByRoute = persisted.ToDictionary(item => item.Route);
             foreach (var route in input.PreferredRoutes.Where(route => route != RecoveryRoute.Reuse))
@@ -221,28 +259,131 @@ public sealed class RecoveryPlannerAgent(RecoveryPlannerToolset tools, RecoveryP
                 alternatives[alternatives.IndexOf(alternative)] = alternative with { Match = match, Pickup = pickup };
             }
             if (alternatives.Count == 0)
-                return Failure(input, runId, started, used, warnings, new("no_feasible_alternatives", "No feasible Recovery alternatives were produced.", false));
+                return await Fail(new("no_feasible_alternatives", "No feasible Recovery alternatives were produced.", false));
+            var reasoningRequest = CreateReasoningRequest(input, assessment.Value!, alternatives, persistedByRoute);
+            GatewayResult<RecoveryReasoningResponse> reasoned;
+            try
+            {
+                reasoned = await reasoning.ReasonAsync(reasoningRequest, cancellationToken).WaitAsync(cancellationToken);
+                if (reasoned.Outcome == GatewayOutcome.Success)
+                    reasoned = new RecoveryReasoningValidator().Validate(reasoned.Value, reasoningRequest);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (OperationCanceledException)
+            {
+                reasoned = GatewayResult<RecoveryReasoningResponse>.Failure(GatewayOutcome.Unavailable,
+                    "reasoning_timeout", "Recovery reasoning timed out.");
+            }
+            catch (Exception)
+            {
+                reasoned = GatewayResult<RecoveryReasoningResponse>.Failure(GatewayOutcome.Unavailable,
+                    "reasoning_provider_failure", "Recovery reasoning is unavailable.");
+            }
+
+            var recommendation = reasoned.Outcome == GatewayOutcome.Success ? reasoned.Value : null;
+            if (recommendation is not null)
+            {
+                var byId = alternatives.ToDictionary(x => persistedByRoute[x.Route].Id);
+                alternatives = recommendation.RankedOptionIds.Select(id => byId[id]).ToList();
+            }
+            else
+            {
+                integrationFailures.Add(SafeReasoningFailure(reasoned));
+                // Retain the pre-existing deterministic route order. Never synthesize an AI response.
+                alternatives = alternatives.Where(x => !x.Valuation.IsReferenceStale).ToList();
+                warnings.Add("Recovery reasoning unavailable or invalid; using existing deterministic planning with human approval.");
+            }
+            var reasoningRecorded = await RecordRecommendationOutcomeAsync(runId, reasoned,
+                alternatives.Select(x => x.Route).ToArray(), cancellationToken);
+            if (!reasoningRecorded.IsSuccess) return await Fail(reasoningRecorded.Error!);
+            if (alternatives.Count == 0)
+                return await Fail(new("IntegrationUnavailable", "Reasoning is unavailable and no valid deterministic fallback exists.", true));
             var proposal = await Call(invoker, RecoveryPlannerToolName.CreateProposalDraft,
                 (t, ct) => t.CreateProposalDraftAsync(new(input.RecoveryCaseId, caseRevision, alternatives,
-                    time.GetUtcNow().Add(runtime.ProposalLifetime)), ct), used, cancellationToken);
-            if (!proposal.IsSuccess) return Failure(input, runId, started, used, warnings, proposal.Error!);
+                    time.GetUtcNow().Add(runtime.ProposalLifetime)) { Recommendation = recommendation }, ct), used, cancellationToken);
+            if (!proposal.IsSuccess) return await Fail(proposal.Error!);
             var approval = await Call(invoker, RecoveryPlannerToolName.RequestHumanApproval,
                 (t, ct) => t.RequestHumanApprovalAsync(proposal.Value, ct), used, cancellationToken);
-            if (!approval.IsSuccess) return Failure(input, runId, started, used, warnings, approval.Error!);
+            if (!approval.IsSuccess || !approval.Value)
+                return await Fail(approval.Error ?? new("approval_unavailable", "Human approval could not be requested.", false));
             if (workflows is not null)
             {
                 var waiting = await workflows.MarkWaitingForApprovalAsync(runId, proposal.Value, caseRevision,
                     time.GetUtcNow().Add(runtime.ProposalLifetime), cancellationToken);
-                if (!waiting.IsSuccess) return Failure(input, runId, started, used, warnings, waiting.Error!);
+                if (!waiting.IsSuccess) return await Fail(waiting.Error!);
             }
-            return Success(input, runId, started, used, warnings, alternatives, proposal.Value);
+            var success = Success(input, runId, started, used, warnings, alternatives, proposal.Value);
+            return success with { Recommendation = recommendation,
+                Summary = success.Summary with { IntegrationFailures = integrationFailures.ToArray() } };
         }
         catch (RecoveryException ex)
         {
-            if (workflows is not null)
-                await workflows.RecordSafeFailureAsync(runId, new(ex.Code, ex.Message, null, time.GetUtcNow()), CancellationToken.None);
-            return Failure(input, runId, started, used, warnings, new(ex.Code, ex.Message, false));
+            return await Fail(new(ex.Code, "Recovery planning failed validation.", false));
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await Fail(new("workflow_cancelled", "Recovery planning was cancelled.", false));
+            throw;
+        }
+        catch (Exception)
+        {
+            return await Fail(new("workflow_failed", "Recovery planning failed safely.", false));
+        }
+    }
+
+    private static RecoveryReasoningRequest CreateReasoningRequest(RecoveryPlannerAgentInput input,
+        AssessmentSummary assessment, IReadOnlyList<RecoveryPlannerAlternative> alternatives,
+        IReadOnlyDictionary<RecoveryRoute, RecoveryPlannerPersistedOption> persisted) =>
+        new(input.RecoveryCaseId, assessment.CategoryId?.ToString() ?? "Unknown",
+            new(assessment.Function, assessment.EvidenceReferences.ToArray()), assessment.Condition,
+            alternatives.Select(option => new RecoveryReasoningOption(persisted[option.Route].Id, option.Route,
+                new(option.Valuation.Inputs.EstimatedProceedsLow, option.Valuation.Inputs.EstimatedProceedsHigh,
+                    option.Valuation.EstimatedRepairCost, option.Valuation.EstimatedPickupCost,
+                    option.Valuation.EstimatedNetValue, option.Valuation.Currency),
+                option.ReferenceIds.Select(id => id.ToString()).ToArray(),
+                option.Match is null ? null : new(option.Match.Eligibility.ToString(), option.Match.Response.ToString()),
+                option.Pickup is null ? null : new(option.Pickup.Feasibility.ToString(), option.Pickup.EstimatedCost,
+                    option.Pickup.Currency))).ToArray(),
+            new(input.Objective, input.MaximumPickupCost, input.Currency, input.Deadline));
+
+    private static RecoveryPlannerError SafeReasoningFailure(GatewayResult<RecoveryReasoningResponse> outcome)
+    {
+        // Provider errors are untrusted too. Only fixed codes and messages enter durable state.
+        var code = outcome.Code switch
+        {
+            "reasoning_timeout" => "reasoning_timeout",
+            "reasoning_authentication_failed" => "reasoning_authentication_failed",
+            "reasoning_transient_failure" => "reasoning_transient_failure",
+            "reasoning_invalid_json" => "reasoning_invalid_json",
+            "reasoning_response_too_large" => "reasoning_response_too_large",
+            _ => outcome.Outcome == GatewayOutcome.Invalid ? "reasoning_invalid_output" : "IntegrationUnavailable"
+        };
+        return new(code, "Recovery reasoning failed safely; no model recommendation was accepted.", outcome.Retryable);
+    }
+
+    private async Task<RecoveryWorkflowResult<bool>> RecordRecommendationOutcomeAsync(Guid runId,
+        GatewayResult<RecoveryReasoningResponse> outcome, IReadOnlyList<RecoveryRoute> orderedRoutes,
+        CancellationToken ct)
+    {
+        if (workflows is null) return RecoveryWorkflowResult<bool>.Success(true);
+        var loaded = await workflows.LoadAsync(runId, ct);
+        if (!loaded.IsSuccess) return RecoveryWorkflowResult<bool>.Failure("workflow_state_unavailable", "Workflow state could not be loaded.", true);
+        var accepted = outcome.Outcome == GatewayOutcome.Success;
+        var failure = SafeReasoningFailure(outcome);
+        var state = loaded.Value!;
+        var saved = await workflows.SaveAsync(state with
+        {
+            StructuredPlan = orderedRoutes,
+            CurrentStep = accepted ? "RecommendationValidated" : "DeterministicFallback",
+            ValidationResults = state.ValidationResults.Append(new("Recommendation", accepted,
+                accepted ? null : failure.Code, accepted ? null : "Reasoning failed; existing deterministic fallback evaluated.", time.GetUtcNow())).ToArray(),
+            ErrorSummaries = accepted ? state.ErrorSummaries : state.ErrorSummaries.Append(new(failure.Code,
+                failure.Message, null, time.GetUtcNow())).ToArray(),
+            CompletedSteps = state.CompletedSteps.Append(new(accepted ? "RecommendationValidated" : "DeterministicFallback",
+                "Completed", time.GetUtcNow())).ToArray()
+        }, state.Version, ct);
+        return saved.IsSuccess ? RecoveryWorkflowResult<bool>.Success(true) :
+            RecoveryWorkflowResult<bool>.Failure("workflow_state_unavailable", "Recommendation outcome could not be persisted.", true);
     }
 
     public async Task<RecoveryWorkflowResult<RecoveryWorkflowState>> ResumeAsync(Guid workflowId,

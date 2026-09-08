@@ -13,4 +13,12 @@ delegated to `ValueEstimationService`; matching and pickup use the Recovery-owne
 The source is compiled only into the Member 2 Recovery test project for Phase 4B verification. A future
 runtime integration must provide a reviewed agent framework or host, durable workflow-state persistence,
 real tool implementations, transaction/idempotency coordination, and an explicit registration boundary.
-No production adapter, endpoint, AI dependency, migration, or shared-file change is included here.
+RecoveryPlannerAgent now accepts IRecoveryReasoningProvider for validated option ranking. The Gemini
+HTTP adapter and unavailable fallback are registered inside the Recovery API module; ordinary CRUD
+does not call them. Failed reasoning records safe workflow metadata and uses the existing valid
+deterministic path without fabricating a recommendation. Every proposal still pauses for human approval.
+
+Production agent compilation, hosting, durable state, and application-service tool adapters remain
+pending. See [the integration request](../../docs/members/member-2/gemini-integration-request.md) and
+[offline validation](../../docs/members/member-2/gemini-validation.md). No endpoint, dependency,
+migration, or shared-file change was added.
