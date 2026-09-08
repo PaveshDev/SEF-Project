@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Compile Include="..\..\..\..\agents\recovery\**\*.cs" Link="Agent\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>
