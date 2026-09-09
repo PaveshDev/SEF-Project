@@ -7,6 +7,23 @@ export async function listCases(params = {}) {
   return data
 }
 
+export async function getCase(id) {
+  const { data } = await apiClient.get(`/api/recovery-cases/${id}`)
+  return data
+}
+
+export async function getOptions(caseId) {
+  const { data } = await apiClient.get(`/api/recovery-cases/${caseId}/options`)
+  return data
+}
+
+export async function submitProposal(caseId, payload) {
+  const { data } = await apiClient.post(`/api/recovery-cases/${caseId}/proposals`, payload, {
+    headers: { 'Idempotency-Key': idempotencyKey() },
+  })
+  return data
+}
+
 export async function createCase(payload) {
   const { data } = await apiClient.post('/api/recovery-cases', payload, {
     headers: { 'Idempotency-Key': idempotencyKey() },

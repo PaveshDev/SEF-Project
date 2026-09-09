@@ -78,11 +78,54 @@ class RecoveryService {
     return response.data ?? {};
   }
 
+  Future<RecoveryCase> getCase(String id) async {
+    final response =
+        await client.get<Map<String, dynamic>>('/api/recovery-cases/$id');
+    return RecoveryCase.fromJson(response.data ?? {});
+  }
+
+  Future<List<RecoveryOption>> getOptions(String caseId) async {
+    final response = await client.get<List<dynamic>>(
+      '/api/recovery-cases/$caseId/options',
+    );
+    return (response.data ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(RecoveryOption.fromJson)
+        .toList();
+  }
+
+  Future<RecoveryProposal> submitProposal({
+    required String caseId,
+    required int expectedVersion,
+    required String optionId,
+    required int optionVersion,
+    MatchChoice? match,
+    PickupChoice? pickup,
+    required DateTime expiresAt,
+    required String explanation,
+  }) async {
+    final response = await client.post<Map<String, dynamic>>(
+      '/api/recovery-cases/$caseId/proposals',
+      data: {
+        'expectedVersion': expectedVersion,
+        'optionId': optionId,
+        'optionVersion': optionVersion,
+        'match': match?.toJson(),
+        'pickup': pickup?.toJson(),
+        'expiresAt': expiresAt.toUtc().toIso8601String(),
+        'explanation': explanation,
+      },
+      options: Options(headers: {'Idempotency-Key': _key()}),
+    );
+    return RecoveryProposal.fromJson(response.data ?? {});
+  }
+
   Future<RecoveryProposal> decideProposal({
     required String id,
     required int version,
     required int revision,
     required String decision,
+    String? comment,
   }) async {
     final response = await client.post<Map<String, dynamic>>(
       '/api/recovery-proposals/$id/decisions',
@@ -90,6 +133,7 @@ class RecoveryService {
         'expectedVersion': version,
         'proposalRevision': revision,
         'decision': decision,
+        'comment': comment,
       },
       options: Options(headers: {'Idempotency-Key': _key()}),
     );
