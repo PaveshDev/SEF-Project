@@ -1,69 +1,97 @@
+using Microsoft.EntityFrameworkCore;
+using WasteToValue.Api.Infrastructure.Persistence;
 using WasteToValue.Api.Modules.Collections.DTOs;
+using WasteToValue.Api.Modules.Collections.Entities;
 using WasteToValue.Api.Modules.Collections.Interfaces;
 
 namespace WasteToValue.Api.Modules.Collections.Services;
 
 /// <summary>
-/// In-memory demo implementation of <see cref="ICollectionSlotService"/>.
-/// Serves deterministic sample data so the API is functional without a database.
-/// Replace with an EF-backed implementation when the migration is coordinated.
+/// EF Core implementation of <see cref="ICollectionSlotService"/>.
+/// Persists collection slot data to the PostgreSQL database via <see cref="AppDbContext"/>.
 /// </summary>
 public sealed class CollectionSlotService : ICollectionSlotService
 {
-    private readonly List<CollectionSlotReadDto> _slots;
+    private readonly AppDbContext _db;
 
-    public CollectionSlotService()
+    public CollectionSlotService(AppDbContext db)
     {
-        var baseDate = new DateTimeOffset(2026, 9, 11, 0, 0, 0, TimeSpan.FromHours(5.5));
-        _slots = new List<CollectionSlotReadDto>
-        {
-            new(Guid.Parse("a1000000-0000-0000-0000-000000000201"), null,
-                baseDate.AddHours(9), baseDate.AddHours(11), "Colombo", 100, 0, "Cargo van", "AVAILABLE",
-                baseDate, baseDate),
-            new(Guid.Parse("a1000000-0000-0000-0000-000000000202"), null,
-                baseDate.AddHours(14), baseDate.AddHours(16), "Colombo", 50, 0, "Small van", "AVAILABLE",
-                baseDate, baseDate),
-            new(Guid.Parse("a1000000-0000-0000-0000-000000000203"), null,
-                baseDate.AddHours(16), baseDate.AddHours(18), "Colombo", 50, 0, "Small van", "AVAILABLE",
-                baseDate, baseDate),
-        };
+        _db = db;
     }
 
-    public Task<IReadOnlyList<CollectionSlotReadDto>> GetAllAsync(CancellationToken ct = default)
-        => Task.FromResult<IReadOnlyList<CollectionSlotReadDto>>(_slots.AsReadOnly());
+    public async Task<IReadOnlyList<CollectionSlotReadDto>> GetAllAsync(CancellationToken ct = default)
+    {
+        var entities = await _db.CollectionSlots
+            .AsNoTracking()
+            .OrderByDescending(s => s.CreatedAt)
+            .ToListAsync(ct);
 
-    public Task<CollectionSlotReadDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
-        => Task.FromResult(_slots.Find(s => s.Id == id));
+        return entities.Select(MapToDto).ToList().AsReadOnly();
+    }
 
-    public Task<CollectionSlotReadDto> CreateAsync(CreateCollectionSlotRequest request, CancellationToken ct = default)
+    public async Task<CollectionSlotReadDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        var entity = await _db.CollectionSlots
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == id, ct);
+
+        return entity is null ? null : MapToDto(entity);
+    }
+
+    public async Task<CollectionSlotReadDto> CreateAsync(CreateCollectionSlotRequest request, CancellationToken ct = default)
     {
         var now = DateTimeOffset.UtcNow;
-        var dto = new CollectionSlotReadDto(
-            Guid.NewGuid(), request.CollectorId, request.StartsAt, request.EndsAt,
-            request.ServiceArea, request.Capacity, 0, request.VehicleClass, "AVAILABLE", now, now);
-        _slots.Add(dto);
-        return Task.FromResult(dto);
+        var entity = new CollectionSlot
+        {
+            Id = Guid.NewGuid(),
+            CollectorId = request.CollectorId,
+            StartsAt = request.StartsAt,
+            EndsAt = request.EndsAt,
+            ServiceArea = request.ServiceArea,
+            Capacity = request.Capacity,
+            ReservedCount = 0,
+            VehicleClass = request.VehicleClass,
+            Status = "AVAILABLE",
+            CreatedAt = now,
+            UpdatedAt = now,
+            Version = 1,
+        };
+
+        _db.CollectionSlots.Add(entity);
+        await _db.SaveChangesAsync(ct);
+        return MapToDto(entity);
     }
 
-    public Task<CollectionSlotReadDto?> UpdateAsync(Guid id, UpdateCollectionSlotRequest request, CancellationToken ct = default)
+    public async Task<CollectionSlotReadDto?> UpdateAsync(Guid id, UpdateCollectionSlotRequest request, CancellationToken ct = default)
     {
-        var index = _slots.FindIndex(s => s.Id == id);
-        if (index < 0) return Task.FromResult<CollectionSlotReadDto?>(null);
+        var entity = await _db.CollectionSlots.FirstOrDefaultAsync(s => s.Id == id, ct);
+        if (entity is null) return null;
 
-        var existing = _slots[index];
-        var updated = new CollectionSlotReadDto(
-            existing.Id, request.CollectorId ?? existing.CollectorId,
-            request.StartsAt ?? existing.StartsAt, request.EndsAt ?? existing.EndsAt,
-            request.ServiceArea ?? existing.ServiceArea, request.Capacity ?? existing.Capacity,
-            existing.ReservedCount, request.VehicleClass ?? existing.VehicleClass,
-            request.Status ?? existing.Status, existing.CreatedAt, DateTimeOffset.UtcNow);
-        _slots[index] = updated;
-        return Task.FromResult<CollectionSlotReadDto?>(updated);
+        if (request.CollectorId is not null) entity.CollectorId = request.CollectorId;
+        if (request.StartsAt is not null) entity.StartsAt = request.StartsAt.Value;
+        if (request.EndsAt is not null) entity.EndsAt = request.EndsAt.Value;
+        if (request.ServiceArea is not null) entity.ServiceArea = request.ServiceArea;
+        if (request.Capacity is not null) entity.Capacity = request.Capacity.Value;
+        if (request.VehicleClass is not null) entity.VehicleClass = request.VehicleClass;
+        if (request.Status is not null) entity.Status = request.Status;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+        return MapToDto(entity);
     }
 
-    public Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var removed = _slots.RemoveAll(s => s.Id == id);
-        return Task.FromResult(removed > 0);
+        var entity = await _db.CollectionSlots.FirstOrDefaultAsync(s => s.Id == id, ct);
+        if (entity is null) return false;
+
+        _db.CollectionSlots.Remove(entity);
+        await _db.SaveChangesAsync(ct);
+        return true;
     }
+
+    private static CollectionSlotReadDto MapToDto(CollectionSlot s) => new(
+        s.Id, s.CollectorId, s.StartsAt, s.EndsAt, s.ServiceArea,
+        s.Capacity, s.ReservedCount, s.VehicleClass, s.Status,
+        s.CreatedAt, s.UpdatedAt);
 }

@@ -1,16 +1,17 @@
 import 'package:dio/dio.dart';
 
-import '../demo_data.dart';
-
-/// Dio-based API client for collection endpoints.
-/// Falls back to demo data when the API is unreachable.
+/// Dio-based API client for Member 4 collection endpoints.
+/// Interfaces with the ASP.NET Core backend for real data persistence and operations.
 class CollectionsApiService {
-  CollectionsApiService({String? baseUrl})
+  CollectionsApiService({String? baseUrl, String? authToken})
       : _dio = Dio(BaseOptions(
           baseUrl: '${baseUrl ?? 'http://localhost:5080'}/api/collections',
           connectTimeout: const Duration(seconds: 5),
           receiveTimeout: const Duration(seconds: 8),
-          headers: <String, String>{'Content-Type': 'application/json'},
+          headers: <String, String>{
+            'Content-Type': 'application/json',
+            if (authToken != null) 'Authorization': 'Bearer $authToken',
+          },
         ));
 
   final Dio _dio;
@@ -20,8 +21,7 @@ class CollectionsApiService {
   Future<List<Map<String, dynamic>>> fetchSlots() async {
     try {
       final response = await _dio.get<List<dynamic>>('/slots');
-      return (response.data ?? <dynamic>[])
-          .cast<Map<String, dynamic>>();
+      return (response.data ?? <dynamic>[]).cast<Map<String, dynamic>>();
     } catch (_) {
       return <Map<String, dynamic>>[];
     }
@@ -35,8 +35,7 @@ class CollectionsApiService {
         '/pickups',
         queryParameters: status != null ? <String, String>{'status': status} : null,
       );
-      return (response.data ?? <dynamic>[])
-          .cast<Map<String, dynamic>>();
+      return (response.data ?? <dynamic>[]).cast<Map<String, dynamic>>();
     } catch (_) {
       return <Map<String, dynamic>>[];
     }
@@ -54,10 +53,25 @@ class CollectionsApiService {
   Future<List<Map<String, dynamic>>> fetchPickupEvents(String pickupId) async {
     try {
       final response = await _dio.get<List<dynamic>>('/pickups/$pickupId/events');
-      return (response.data ?? <dynamic>[])
-          .cast<Map<String, dynamic>>();
+      return (response.data ?? <dynamic>[]).cast<Map<String, dynamic>>();
     } catch (_) {
       return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<Map<String, dynamic>?> reschedulePickup(String id, String reason, String requestedBy) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/pickups/$id/reschedule',
+        data: <String, String>{
+          'pickupRequestId': id,
+          'requestedBy': requestedBy,
+          'reason': reason,
+        },
+      );
+      return response.data;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -68,14 +82,36 @@ class CollectionsApiService {
     String code,
     String actorId,
   ) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/pickups/$pickupId/handover/verify',
+      data: <String, String>{'code': code, 'actorId': actorId},
+    );
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>?> submitHandoverProof(
+    String pickupId,
+    String proofType,
+    String actorId, {
+    String? storageKey,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/pickups/$pickupId/handover/proof',
+      data: <String, String>{
+        'proofType': proofType,
+        'actorId': actorId,
+        if (storageKey != null) 'storageKey': storageKey,
+      },
+    );
+    return response.data;
+  }
+
+  Future<List<Map<String, dynamic>>> fetchHandoverProofs(String pickupId) async {
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/pickups/$pickupId/handover/verify',
-        data: <String, String>{'code': code, 'actorId': actorId},
-      );
-      return response.data;
+      final response = await _dio.get<List<dynamic>>('/pickups/$pickupId/handover');
+      return (response.data ?? <dynamic>[]).cast<Map<String, dynamic>>();
     } catch (_) {
-      return null;
+      return <Map<String, dynamic>>[];
     }
   }
 
@@ -97,22 +133,18 @@ class CollectionsApiService {
     String proposalId,
     String decision,
     String decidedBy, {
-    String? comment,
+    String? notes,
   }) async {
-    try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/agent/proposals/$proposalId/approve',
-        data: <String, dynamic>{
-          'proposalId': proposalId,
-          'decision': decision,
-          'decidedBy': decidedBy,
-          'comment': comment,
-        },
-      );
-      return response.data;
-    } catch (_) {
-      return null;
-    }
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/agent/proposals/$proposalId/approve',
+      data: <String, dynamic>{
+        'proposalId': proposalId,
+        'decision': decision,
+        'decidedBy': decidedBy,
+        'notes': notes,
+      },
+    );
+    return response.data;
   }
 
   /// Check if the API is reachable.

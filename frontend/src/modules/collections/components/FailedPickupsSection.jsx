@@ -16,5 +16,5 @@ export default function FailedPickupsSection({ jobs, setSection, setModal, Icon,
         <button className="cl-button cl-primary" onClick={() => setModal({ type: 'reschedule', id: job.id })}>Draft revision request</button>
       </div>
     </div>
-  </section>)}{failed.length === 0 && <div className="cl-empty">No failed pickups in the demo.</div>}</div>
+  </section>)}{failed.length === 0 && <div className="cl-empty">No failed pickups found. All pickups are on schedule or completed.</div>}</div>
 }

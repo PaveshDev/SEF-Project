@@ -1,28 +1,44 @@
 import 'package:flutter/material.dart';
-
 import '../demo_data.dart';
+import '../services/collections_api_service.dart';
+import 'handover_screen.dart';
 
 const _forest = Color(0xFF2D674E);
 const _ink = Color(0xFF203B32);
 const _muted = Color(0xFF64745F);
 const _canvas = Color(0xFFF5F6F2);
 
-/// Dedicated pickup detail screen with milestones, proposal review,
+/// Dedicated pickup detail screen connected to backend API for live milestones,
 /// handover entry, and failure reporting.
 class PickupDetailScreen extends StatefulWidget {
-  const PickupDetailScreen({super.key, required this.pickup, required this.role});
+  const PickupDetailScreen({super.key, required this.pickup, required this.role, this.apiService});
   final DemoPickup pickup;
   final String role;
+  final CollectionsApiService? apiService;
 
   @override
   State<PickupDetailScreen> createState() => _PickupDetailScreenState();
 }
 
 class _PickupDetailScreenState extends State<PickupDetailScreen> {
+  late final CollectionsApiService _api;
   final _code = TextEditingController();
   final _proof = TextEditingController();
   final _handoverForm = GlobalKey<FormState>();
-  String? _milestonePreview;
+  
+  bool _loadingEvents = false;
+  bool _verifyingCode = false;
+  List<Map<String, dynamic>> _events = <Map<String, dynamic>>[];
+  String _currentStatus = '';
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _api = widget.apiService ?? CollectionsApiService();
+    _currentStatus = widget.pickup.status;
+    _loadEvents();
+  }
 
   @override
   void dispose() {
@@ -37,10 +53,58 @@ class _PickupDetailScreenState extends State<PickupDetailScreen> {
       ..showSnackBar(SnackBar(content: Text(text)));
   }
 
+  Future<void> _loadEvents() async {
+    setState(() => _loadingEvents = true);
+    try {
+      final events = await _api.fetchPickupEvents(widget.pickup.id);
+      final fetchedPickup = await _api.fetchPickup(widget.pickup.id);
+      
+      if (mounted) {
+        setState(() {
+          _events = events;
+          if (fetchedPickup != null && fetchedPickup['status'] != null) {
+            _currentStatus = fetchedPickup['status'].toString();
+          }
+        });
+      }
+    } catch (_) {
+      // Keep local state fallback
+    } finally {
+      if (mounted) setState(() => _loadingEvents = false);
+    }
+  }
+
+  Future<void> _submitHandoverVerification() async {
+    if (!_handoverForm.currentState!.validate()) return;
+
+    setState(() {
+      _verifyingCode = true;
+      _errorMessage = null;
+    });
+
+    final actorId = 'b1000000-0000-0000-0000-000000000001';
+
+    try {
+      final result = await _api.verifyHandoverCode(widget.pickup.id, _code.text.trim(), actorId);
+      if (result != null) {
+        _message('Code verified successfully! Pickup updated in backend.');
+        _code.clear();
+        _proof.clear();
+        await _loadEvents();
+      } else {
+        setState(() => _errorMessage = 'Invalid or expired OTP code.');
+      }
+    } catch (e) {
+      setState(() => _errorMessage = 'Verification error: ${e.toString().replaceAll('Exception:', '').trim()}');
+    } finally {
+      if (mounted) setState(() => _verifyingCode = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final pickup = widget.pickup;
-    final stepIndex = collectionMilestones.indexOf(pickup.status);
+    final stepIndex = collectionMilestones.indexOf(_currentStatus);
 
     return Theme(
       data: Theme.of(context).copyWith(
@@ -53,7 +117,17 @@ class _PickupDetailScreenState extends State<PickupDetailScreen> {
       ),
       child: Scaffold(
         backgroundColor: _canvas,
-        appBar: AppBar(backgroundColor: _canvas, title: Text(pickup.id)),
+        appBar: AppBar(
+          backgroundColor: _canvas,
+          title: Text(pickup.id),
+          actions: <Widget>[
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _loadEvents,
+              tooltip: 'Refresh details & audit history',
+            ),
+          ],
+        ),
         body: SafeArea(
           child: Center(
             child: ConstrainedBox(
@@ -61,7 +135,7 @@ class _PickupDetailScreenState extends State<PickupDetailScreen> {
               child: ListView(padding: const EdgeInsets.all(20), children: <Widget>[
                 Text(pickup.item, style: const TextStyle(fontSize: 28, fontFamily: 'serif', color: _ink)),
                 const SizedBox(height: 10),
-                _StatusChip(pickup.status),
+                _StatusChip(_currentStatus),
                 const SizedBox(height: 20),
 
                 // Collection details
@@ -73,14 +147,15 @@ class _PickupDetailScreenState extends State<PickupDetailScreen> {
                   _DetailRow(Icons.storefront_outlined, 'Destination', pickup.destination),
                   _DetailRow(Icons.local_shipping_outlined, 'Vehicle', pickup.vehicle),
                   _DetailRow(Icons.inventory_2_outlined, 'Handling', pickup.handling),
-                  const SizedBox(height: 8),
-                  const Text('Map and travel estimate unavailable.', style: TextStyle(color: _muted, fontSize: 12)),
                 ])),
                 const SizedBox(height: 20),
 
                 // Milestones
                 _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-                  const Text('Collection milestones', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: _ink)),
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: <Widget>[
+                    const Text('Collection milestones', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: _ink)),
+                    if (_loadingEvents) const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                  ]),
                   const SizedBox(height: 16),
                   ...collectionMilestones.asMap().entries.map((entry) => Padding(
                     padding: const EdgeInsets.symmetric(vertical: 9),
@@ -95,68 +170,79 @@ class _PickupDetailScreenState extends State<PickupDetailScreen> {
                       if (entry.key == stepIndex) const Text('Current', style: TextStyle(fontSize: 10, color: _muted)),
                     ]),
                   )),
-                  if (widget.role == 'Collector' && stepIndex >= 0 && stepIndex < 4) ...<Widget>[
-                    const Divider(height: 30),
-                    DropdownButtonFormField<String>(
-                      value: _milestonePreview,
-                      isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Preview status update'),
-                      items: collectionMilestones.take(4).map((status) =>
-                        DropdownMenuItem<String>(value: status, child: Text(status)),
-                      ).toList(),
-                      onChanged: (value) => setState(() => _milestonePreview = value),
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton(
-                      onPressed: _milestonePreview == null ? null : () =>
-                        _message('Preview: $_milestonePreview. Backend unavailable; status unchanged.'),
-                      child: const Text('Preview status submission'),
-                    ),
-                  ],
                 ])),
                 const SizedBox(height: 20),
 
-                // Handover entry
+                // Backend Audit Event History
+                if (_events.isNotEmpty) ...<Widget>[
+                  _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+                    const Text('Backend Audit Event Logs', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: _ink)),
+                    const SizedBox(height: 12),
+                    ..._events.map((e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+                        const Icon(Icons.history, size: 18, color: _forest),
+                        const SizedBox(width: 8),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+                          Text('${e['eventType'] ?? 'EVENT'}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          if (e['notes'] != null) Text('${e['notes']}', style: const TextStyle(fontSize: 12, color: _muted)),
+                        ])),
+                      ]),
+                    )),
+                  ])),
+                  const SizedBox(height: 20),
+                ],
+
+                // Handover entry Form
                 _Card(child: Form(
                   key: _handoverForm,
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-                    const Text('Handover verification', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: _ink)),
+                    const Text('Handover Verification (OTP)', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: _ink)),
                     const SizedBox(height: 8),
-                    const Text('Code validation requires the ASP.NET backend.', style: TextStyle(color: _muted, fontSize: 12)),
+                    const Text('Verification submits to the backend API and updates status.', style: TextStyle(color: _muted, fontSize: 12)),
                     const SizedBox(height: 18),
-                    const Row(children: <Widget>[
-                      Icon(Icons.qr_code_scanner, size: 32, color: _muted),
-                      SizedBox(width: 12),
-                      Expanded(child: Text('QR scanner unavailable\nCamera integration not connected.', style: TextStyle(color: _muted, fontSize: 12))),
+                    Row(children: <Widget>[
+                      const Icon(Icons.qr_code_scanner, size: 32, color: _forest),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () async {
+                            final refreshed = await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute<bool>(
+                                builder: (context) => HandoverScreen(pickupId: pickup.id, itemName: pickup.item, apiService: _api),
+                              ),
+                            );
+                            if (refreshed == true) {
+                              await _loadEvents();
+                            }
+                          },
+                          child: const Text('Open QR / Full Handover Screen'),
+                        ),
+                      ),
                     ]),
                     const SizedBox(height: 20),
                     TextFormField(
                       controller: _code,
                       keyboardType: TextInputType.number,
                       maxLength: 6,
+                      enabled: !_verifyingCode,
                       decoration: const InputDecoration(labelText: 'One-time code (6 digits)'),
                       validator: (value) => RegExp(r'^\d{6}$').hasMatch(value ?? '') ? null : 'Enter exactly 6 digits.',
                     ),
-                    TextFormField(
-                      controller: _proof,
-                      maxLines: 2,
-                      maxLength: 300,
-                      decoration: const InputDecoration(labelText: 'Handover proof note'),
-                    ),
-                    const SizedBox(height: 16),
+                    if (_errorMessage != null) ...<Widget>[
+                      Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                      const SizedBox(height: 12),
+                    ],
                     FilledButton.icon(
-                      onPressed: () {
-                        if (_handoverForm.currentState!.validate()) {
-                          _message('Code format accepted. Verification unavailable without backend.');
-                        }
-                      },
-                      icon: const Icon(Icons.fact_check_outlined),
-                      label: const Text('Preview code submission'),
+                      onPressed: _verifyingCode ? null : _submitHandoverVerification,
+                      icon: _verifyingCode ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.fact_check_outlined),
+                      label: Text(_verifyingCode ? 'Verifying...' : 'Submit OTP Code to Backend'),
                     ),
                   ]),
                 )),
                 const SizedBox(height: 24),
-                const Text('Changes stay on this device.', style: TextStyle(color: _muted, fontSize: 11), textAlign: TextAlign.center),
+                const Text('Member 4 · Synchronized with ASP.NET backend', style: TextStyle(color: _muted, fontSize: 11), textAlign: TextAlign.center),
               ]),
             ),
           ),

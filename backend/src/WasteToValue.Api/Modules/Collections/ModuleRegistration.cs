@@ -1,3 +1,4 @@
+using WasteToValue.Api.Modules.Collections.Agents.Tools;
 using WasteToValue.Api.Modules.Collections.Interfaces;
 using WasteToValue.Api.Modules.Collections.Services;
 
@@ -8,19 +9,22 @@ public static class ModuleRegistration
     public static IServiceCollection AddCollectionsModule(this IServiceCollection services)
     {
         // Collection slot management
-        services.AddSingleton<ICollectionSlotService, CollectionSlotService>();
+        services.AddScoped<ICollectionSlotService, CollectionSlotService>();
 
         // Pickup request lifecycle
-        services.AddSingleton<IPickupRequestService, PickupRequestService>();
+        services.AddScoped<IPickupRequestService, PickupRequestService>();
 
         // Handover verification
-        services.AddSingleton<IHandoverService, HandoverService>();
+        services.AddScoped<IHandoverService, HandoverService>();
 
-        // External routing/maps API (placeholder — returns unavailable)
-        services.AddSingleton<ITravelEstimateService, TravelEstimateService>();
+        // External routing/maps API
+        services.AddScoped<ITravelEstimateService, TravelEstimateService>();
 
-        // Collection Agent orchestrator (placeholder — deterministic demo proposals)
-        services.AddSingleton<ICollectionAgentService, CollectionAgentService>();
+        // Collection Agent allow-listed tools
+        services.AddScoped<ICollectionAgentTools, CollectionAgentTools>();
+
+        // Collection Agent orchestrator
+        services.AddScoped<ICollectionAgentService, CollectionAgentService>();
 
         return services;
     }

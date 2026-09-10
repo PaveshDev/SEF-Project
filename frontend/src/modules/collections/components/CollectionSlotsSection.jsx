@@ -16,6 +16,6 @@ export default function CollectionSlotsSection({ slots, setModal, Icon }) {
         <button className="cl-text-button cl-danger" onClick={() => setModal({ type: 'deleteSlot', slot })}>Delete</button>
       </div>
     </article>)}</div>
-    {slots.length === 0 && <div className="cl-empty">No demo slots. Add one to preview availability.</div>}
+    {slots.length === 0 && <div className="cl-empty">No collection slots available. Add a slot to define capacity and scheduling windows.</div>}
   </section>
 }

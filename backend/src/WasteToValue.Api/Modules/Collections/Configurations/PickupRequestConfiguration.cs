@@ -20,6 +20,7 @@ public sealed class PickupRequestConfiguration : IEntityTypeConfiguration<Pickup
         builder.Property(e => e.ScheduledStart).HasColumnName("scheduled_start");
         builder.Property(e => e.ScheduledEnd).HasColumnName("scheduled_end");
         builder.Property(e => e.Status).HasColumnName("status").HasMaxLength(30).HasDefaultValue("CONFIRMED");
+        builder.Property(e => e.VerificationCode).HasColumnName("verification_code").HasMaxLength(50);
         builder.Property(e => e.IdempotencyKey).HasColumnName("idempotency_key").HasMaxLength(100).IsRequired();
         builder.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
         builder.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");

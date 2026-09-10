@@ -6,18 +6,16 @@ import {
   verifyHandoverCode, submitHandoverProof, fetchHandoverProofs,
   prepareCollectionPlan, rescheduleAgent, fetchProposal, approveProposal,
 } from '../services/collectionsApi.js'
-import { demoJobs, demoSlots } from '../demoData.js'
 
 /**
- * Central hook that tries the ASP.NET Collections API first
- * and falls back to local demo fixtures when the backend is unreachable.
- *
- * All CRUD helpers call the API service, then update local state
- * optimistically so the UI reflects the change immediately.
+ * Member 4 Collections Hook.
+ * Communicates directly with the ASP.NET Core Collections API.
+ * Distinguishes API connectivity by HTTP status, not record count.
+ * Propagates real errors and avoids silent demo fallbacks.
  */
 export function useCollections() {
-  const [jobs, setJobs] = useState(demoJobs)
-  const [slots, setSlots] = useState(demoSlots)
+  const [jobs, setJobs] = useState([])
+  const [slots, setSlots] = useState([])
   const [proposal, setProposal] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -30,14 +28,16 @@ export function useCollections() {
     setError(null)
     try {
       const [pickupData, slotData] = await Promise.all([fetchPickups(), fetchSlots()])
-      // The API service returns objects without `_demo` when the backend responds
-      if (pickupData && pickupData.length > 0 && !pickupData[0]._demo) {
-        setApiConnected(true)
-      }
-      setJobs(pickupData[0]?._demo ? demoJobs : pickupData)
-      setSlots(slotData)
+      // HTTP 200 from backend: API is connected even if arrays are empty []
+      setApiConnected(true)
+      setJobs(pickupData || [])
+      setSlots(slotData || [])
     } catch (err) {
-      setError(err.message)
+      setApiConnected(false)
+      const msg = err.response?.data?.error || err.response?.data?.title || err.message || 'Failed to connect to backend API'
+      setError(msg)
+      setJobs([])
+      setSlots([])
     } finally {
       setLoading(false)
     }
@@ -48,57 +48,44 @@ export function useCollections() {
   // ── Pickup CRUD ──────────────────────────────────────────
 
   const addJob = useCallback(async (jobData) => {
-    if (apiConnected) {
-      const result = await createPickup(jobData)
-      if (result) { setJobs(current => [...current, result]); return result }
+    setError(null)
+    const result = await createPickup(jobData)
+    if (result) {
+      await loadData()
+      return result
     }
-    // Fallback: add locally with a generated id
-    const local = {
-      ...jobData,
-      id: jobData.id || `DRAFT-${crypto.randomUUID().slice(0, 8)}`,
-      status: jobData.status || 'Draft',
-      history: jobData.history || ['Draft created locally — not submitted'],
-    }
-    setJobs(current => [...current, local])
-    return local
-  }, [apiConnected])
+    return null
+  }, [loadData])
 
   const updateJob = useCallback(async (id, update) => {
-    if (apiConnected) {
-      const result = await updatePickup(id, update)
-      if (result) {
-        setJobs(current => current.map(job => job.id === id ? result : job))
-        return result
-      }
+    setError(null)
+    const result = await updatePickup(id, update)
+    if (result) {
+      await loadData()
+      return result
     }
-    // Fallback: update locally
-    setJobs(current => current.map(job => job.id === id ? { ...job, ...update } : job))
     return null
-  }, [apiConnected])
+  }, [loadData])
 
   const removeJob = useCallback(async (id) => {
-    if (apiConnected) {
-      const ok = await deletePickup(id)
-      if (ok) { setJobs(current => current.filter(job => job.id !== id)); return true }
+    setError(null)
+    const ok = await deletePickup(id)
+    if (ok) {
+      await loadData()
+      return true
     }
-    setJobs(current => current.filter(job => job.id !== id))
-    return true
-  }, [apiConnected])
+    return false
+  }, [loadData])
 
   const rescheduleJob = useCallback(async (id, request) => {
-    if (apiConnected) {
-      const result = await reschedulePickup(id, request)
-      if (result) {
-        setJobs(current => current.map(job => job.id === id ? result : job))
-        return result
-      }
+    setError(null)
+    const result = await reschedulePickup(id, request)
+    if (result) {
+      await loadData()
+      return result
     }
-    // Fallback: update status locally
-    setJobs(current => current.map(job => job.id === id
-      ? { ...job, status: 'Failed', rescheduleNote: request.reason, history: [...(job.history || []), `Local revision request: ${request.reason}`] }
-      : job))
     return null
-  }, [apiConnected])
+  }, [loadData])
 
   const loadEvents = useCallback(async (pickupId) => {
     return await fetchPickupEvents(pickupId)
@@ -107,35 +94,34 @@ export function useCollections() {
   // ── Collection Slot CRUD ─────────────────────────────────
 
   const addSlot = useCallback(async (slotData) => {
-    if (apiConnected) {
-      const result = await createSlot(slotData)
-      if (result) { setSlots(current => [...current, result]); return result }
+    setError(null)
+    const result = await createSlot(slotData)
+    if (result) {
+      await loadData()
+      return result
     }
-    const local = { ...slotData, id: slotData.id || `SL-${crypto.randomUUID().slice(0, 8)}` }
-    setSlots(current => [...current, local])
-    return local
-  }, [apiConnected])
+    return null
+  }, [loadData])
 
   const editSlot = useCallback(async (id, update) => {
-    if (apiConnected) {
-      const result = await updateSlot(id, update)
-      if (result) {
-        setSlots(current => current.map(s => s.id === id ? result : s))
-        return result
-      }
+    setError(null)
+    const result = await updateSlot(id, update)
+    if (result) {
+      await loadData()
+      return result
     }
-    setSlots(current => current.map(s => s.id === id ? { ...s, ...update } : s))
     return null
-  }, [apiConnected])
+  }, [loadData])
 
   const removeSlot = useCallback(async (id) => {
-    if (apiConnected) {
-      const ok = await deleteSlot(id)
-      if (ok) { setSlots(current => current.filter(s => s.id !== id)); return true }
+    setError(null)
+    const ok = await deleteSlot(id)
+    if (ok) {
+      await loadData()
+      return true
     }
-    setSlots(current => current.filter(s => s.id !== id))
-    return true
-  }, [apiConnected])
+    return false
+  }, [loadData])
 
   const updateSlots = useCallback((newSlots) => {
     setSlots(newSlots)
@@ -207,7 +193,7 @@ export function useCollections() {
     addSlot, editSlot, removeSlot, updateSlots, setSlots,
 
     // Handover
-    verifyCode, submitProof,
+    verifyCode, submitProof, loadProofs,
 
     // Agent
     requestPlan, requestReschedule, submitApproval,

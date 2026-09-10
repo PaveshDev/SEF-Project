@@ -1,121 +1,326 @@
+using Microsoft.EntityFrameworkCore;
+using WasteToValue.Api.Infrastructure.Persistence;
 using WasteToValue.Api.Modules.Collections.DTOs;
+using WasteToValue.Api.Modules.Collections.Entities;
 using WasteToValue.Api.Modules.Collections.Interfaces;
+using WasteToValue.Api.Modules.Collections.Validators;
 
 namespace WasteToValue.Api.Modules.Collections.Services;
 
 /// <summary>
-/// In-memory demo implementation of <see cref="IPickupRequestService"/>.
-/// Provides sample pickup data matching the React/Flutter demo fixtures.
+/// EF Core database-backed implementation of <see cref="IPickupRequestService"/>.
+/// Handles pickup request lifecycle, state machine transitions, and database persistence.
 /// </summary>
 public sealed class PickupRequestService : IPickupRequestService
 {
-    private readonly List<PickupRequestReadDto> _pickups;
-    private readonly List<PickupEventReadDto> _events;
+    private readonly AppDbContext _db;
 
-    public PickupRequestService()
+    public PickupRequestService(AppDbContext db)
     {
-        var baseDate = new DateTimeOffset(2026, 9, 11, 0, 0, 0, TimeSpan.FromHours(5.5));
-        var demoOwnerId = Guid.Parse("b1000000-0000-0000-0000-000000000001");
-        var demoSlotId = Guid.Parse("a1000000-0000-0000-0000-000000000202");
-
-        _pickups = new List<PickupRequestReadDto>
-        {
-            new(Guid.Parse("c1000000-0000-0000-0000-000000001042"), Guid.NewGuid(), demoSlotId, null, demoOwnerId,
-                baseDate.AddHours(14), baseDate.AddHours(16), "PROPOSED", baseDate, baseDate, null),
-            new(Guid.Parse("c1000000-0000-0000-0000-000000001041"), Guid.NewGuid(),
-                Guid.Parse("a1000000-0000-0000-0000-000000000201"), null, demoOwnerId,
-                baseDate.AddHours(9), baseDate.AddHours(11), "CONFIRMED", baseDate, baseDate, null),
-            new(Guid.Parse("c1000000-0000-0000-0000-000000001040"), Guid.NewGuid(),
-                Guid.Parse("a1000000-0000-0000-0000-000000000201"), null, demoOwnerId,
-                baseDate.AddHours(11), baseDate.AddHours(13), "FAILED", baseDate, baseDate, null),
-            new(Guid.Parse("c1000000-0000-0000-0000-000000001039"), Guid.NewGuid(),
-                Guid.Parse("a1000000-0000-0000-0000-000000000201"), null, demoOwnerId,
-                baseDate.AddHours(8), baseDate.AddHours(10), "ASSIGNED", baseDate, baseDate, null),
-            new(Guid.Parse("c1000000-0000-0000-0000-000000001038"), Guid.NewGuid(),
-                Guid.Parse("a1000000-0000-0000-0000-000000000202"), null, demoOwnerId,
-                baseDate.AddHours(-11), baseDate.AddHours(-9), "DELIVERED", baseDate.AddDays(-1), baseDate, null),
-        };
-
-        _events = new List<PickupEventReadDto>
-        {
-            new(Guid.NewGuid(), _pickups[1].Id, "CONFIRMED", demoOwnerId, baseDate, "Sample assignment"),
-            new(Guid.NewGuid(), _pickups[2].Id, "CONFIRMED", demoOwnerId, baseDate, "Sample assignment"),
-            new(Guid.NewGuid(), _pickups[2].Id, "FAILED", demoOwnerId, baseDate.AddHours(1), "Assigned vehicle unavailable"),
-            new(Guid.NewGuid(), _pickups[3].Id, "CONFIRMED", demoOwnerId, baseDate, "Sample assignment"),
-            new(Guid.NewGuid(), _pickups[3].Id, "ASSIGNED", demoOwnerId, baseDate.AddHours(1), "En route"),
-            new(Guid.NewGuid(), _pickups[4].Id, "CONFIRMED", demoOwnerId, baseDate.AddDays(-1), null),
-            new(Guid.NewGuid(), _pickups[4].Id, "COLLECTED", demoOwnerId, baseDate.AddDays(-1).AddHours(2), null),
-            new(Guid.NewGuid(), _pickups[4].Id, "DELIVERED", demoOwnerId, baseDate.AddDays(-1).AddHours(3), null),
-        };
+        _db = db;
     }
 
-    public Task<IReadOnlyList<PickupRequestReadDto>> GetAllAsync(string? statusFilter = null, CancellationToken ct = default)
+    public async Task<IReadOnlyList<PickupRequestReadDto>> GetAllAsync(string? statusFilter = null, CancellationToken ct = default)
     {
-        var result = string.IsNullOrWhiteSpace(statusFilter)
-            ? _pickups
-            : _pickups.Where(p => p.Status.Equals(statusFilter, StringComparison.OrdinalIgnoreCase)).ToList();
-        return Task.FromResult<IReadOnlyList<PickupRequestReadDto>>(result.AsReadOnly());
+        var query = _db.PickupRequests
+            .AsNoTracking()
+            .Include(p => p.CollectionSlot)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(statusFilter))
+        {
+            query = query.Where(p => p.Status == statusFilter.ToUpperInvariant());
+        }
+
+        var entities = await query.OrderByDescending(p => p.CreatedAt).ToListAsync(ct);
+        return entities.Select(MapToDto).ToList().AsReadOnly();
     }
 
-    public Task<PickupRequestReadDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
-        => Task.FromResult(_pickups.Find(p => p.Id == id));
-
-    public Task<PickupRequestReadDto> CreateAsync(CreatePickupRequestRequest request, CancellationToken ct = default)
+    public async Task<PickupRequestReadDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
+        var entity = await _db.PickupRequests
+            .AsNoTracking()
+            .Include(p => p.CollectionSlot)
+            .FirstOrDefaultAsync(p => p.Id == id, ct);
+
+        return entity is null ? null : MapToDto(entity);
+    }
+
+    public async Task<PickupRequestReadDto> CreateAsync(CreatePickupRequestRequest request, CancellationToken ct = default)
+    {
+        // 1. Verify collection slot availability if slot ID is provided
+        CollectionSlot? slot = null;
+        if (request.CollectionSlotId != Guid.Empty)
+        {
+            slot = await _db.CollectionSlots.FirstOrDefaultAsync(s => s.Id == request.CollectionSlotId, ct);
+            if (slot is null)
+            {
+                throw new InvalidOperationException($"Collection slot {request.CollectionSlotId} not found.");
+            }
+
+            if (!slot.Status.Equals("AVAILABLE", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Collection slot {request.CollectionSlotId} is unavailable (status: {slot.Status}).");
+            }
+
+            if (slot.ReservedCount >= slot.Capacity)
+            {
+                throw new InvalidOperationException($"Collection slot {request.CollectionSlotId} is fully booked (capacity: {slot.Capacity}).");
+            }
+        }
+
         var now = DateTimeOffset.UtcNow;
-        var dto = new PickupRequestReadDto(
-            Guid.NewGuid(), request.RecoveryProposalId, request.CollectionSlotId,
-            null, request.OwnerId, request.ScheduledStart, request.ScheduledEnd,
-            "DRAFT", now, now, null);
-        _pickups.Add(dto);
-        return Task.FromResult(dto);
+        var pickupId = Guid.NewGuid();
+        var plainCode = HandoverCodeHasher.GeneratePlainCode();
+        var verificationString = HandoverCodeHasher.FormatVerificationString(pickupId, plainCode);
+
+        var entity = new PickupRequest
+        {
+            Id = pickupId,
+            RecoveryProposalId = request.RecoveryProposalId,
+            CollectionSlotId = request.CollectionSlotId,
+            CollectorId = null,
+            OwnerId = request.OwnerId,
+            PickupAddressEncrypted = "EncryptedAddressPlaceholder",
+            ScheduledStart = request.ScheduledStart,
+            ScheduledEnd = request.ScheduledEnd,
+            Status = "CONFIRMED",
+            VerificationCode = verificationString,
+            IdempotencyKey = Guid.NewGuid().ToString("N"),
+            CreatedAt = now,
+            UpdatedAt = now,
+            Version = 1,
+            CollectionSlot = slot
+        };
+
+        if (slot is not null)
+        {
+            slot.ReservedCount += 1;
+            if (slot.ReservedCount >= slot.Capacity)
+            {
+                slot.Status = "BOOKED";
+            }
+        }
+
+        var initialEvent = new PickupEvent
+        {
+            Id = Guid.NewGuid(),
+            PickupRequestId = pickupId,
+            EventType = "CONFIRMED",
+            ActorId = request.OwnerId,
+            EventAt = now,
+            Notes = "Pickup request created and confirmed.",
+            IdempotencyKey = Guid.NewGuid().ToString("N")
+        };
+
+        _db.PickupRequests.Add(entity);
+        _db.PickupEvents.Add(initialEvent);
+
+        await _db.SaveChangesAsync(ct);
+        return MapToDto(entity);
     }
 
-    public Task<PickupRequestReadDto?> UpdateAsync(Guid id, UpdatePickupRequestRequest request, CancellationToken ct = default)
+    public async Task<PickupRequestReadDto?> UpdateAsync(Guid id, UpdatePickupRequestRequest request, CancellationToken ct = default)
     {
-        var index = _pickups.FindIndex(p => p.Id == id);
-        if (index < 0) return Task.FromResult<PickupRequestReadDto?>(null);
+        var entity = await _db.PickupRequests
+            .Include(p => p.CollectionSlot)
+            .FirstOrDefaultAsync(p => p.Id == id, ct);
 
-        var existing = _pickups[index];
-        var updated = new PickupRequestReadDto(
-            existing.Id, existing.RecoveryProposalId, existing.CollectionSlotId,
-            request.CollectorId ?? existing.CollectorId, existing.OwnerId,
-            request.ScheduledStart ?? existing.ScheduledStart,
-            request.ScheduledEnd ?? existing.ScheduledEnd,
-            request.Status ?? existing.Status,
-            existing.CreatedAt, DateTimeOffset.UtcNow, existing.CollectionSlot);
-        _pickups[index] = updated;
-        return Task.FromResult<PickupRequestReadDto?>(updated);
+        if (entity is null) return null;
+
+        var now = DateTimeOffset.UtcNow;
+
+        // If status transition is requested, validate state machine logic
+        if (!string.IsNullOrWhiteSpace(request.Status) &&
+            !request.Status.Equals(entity.Status, StringComparison.OrdinalIgnoreCase))
+        {
+            var targetStatus = request.Status.ToUpperInvariant();
+
+            if (!IsValidStatusTransition(entity.Status, targetStatus))
+            {
+                throw new InvalidOperationException($"Invalid status transition from {entity.Status} to {targetStatus}.");
+            }
+
+            // Specific business rule validations:
+            if (targetStatus == "DELIVERED")
+            {
+                var hasProof = await _db.HandoverProofs.AnyAsync(h => h.PickupRequestId == id, ct);
+                if (!hasProof)
+                {
+                    throw new InvalidOperationException("Cannot transition pickup to DELIVERED without recorded handover proof.");
+                }
+            }
+
+            if (targetStatus == "CONFIRMED" && entity.Status != "PENDING_APPROVAL")
+            {
+                throw new InvalidOperationException("Cannot confirm pickup request prior to staff approval.");
+            }
+
+            // Log event for status change
+            _db.PickupEvents.Add(new PickupEvent
+            {
+                Id = Guid.NewGuid(),
+                PickupRequestId = id,
+                EventType = targetStatus,
+                ActorId = request.CollectorId ?? entity.CollectorId ?? entity.OwnerId,
+                EventAt = now,
+                Notes = $"Status changed from {entity.Status} to {targetStatus}.",
+                IdempotencyKey = Guid.NewGuid().ToString("N")
+            });
+
+            entity.Status = targetStatus;
+        }
+
+        if (request.CollectorId is not null) entity.CollectorId = request.CollectorId;
+        if (request.ScheduledStart is not null) entity.ScheduledStart = request.ScheduledStart.Value;
+        if (request.ScheduledEnd is not null) entity.ScheduledEnd = request.ScheduledEnd.Value;
+        entity.UpdatedAt = now;
+
+        await _db.SaveChangesAsync(ct);
+        return MapToDto(entity);
     }
 
-    public Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var removed = _pickups.RemoveAll(p => p.Id == id);
-        return Task.FromResult(removed > 0);
+        var entity = await _db.PickupRequests
+            .Include(p => p.CollectionSlot)
+            .FirstOrDefaultAsync(p => p.Id == id, ct);
+
+        if (entity is null) return false;
+
+        // Mark as cancelled or remove
+        if (entity.Status == "DELIVERED")
+        {
+            throw new InvalidOperationException("Cannot cancel or delete a DELIVERED pickup request.");
+        }
+
+        if (entity.CollectionSlot is not null && entity.CollectionSlot.ReservedCount > 0)
+        {
+            entity.CollectionSlot.ReservedCount -= 1;
+            if (entity.CollectionSlot.Status == "BOOKED")
+            {
+                entity.CollectionSlot.Status = "AVAILABLE";
+            }
+        }
+
+        entity.Status = "CANCELLED";
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+
+        _db.PickupEvents.Add(new PickupEvent
+        {
+            Id = Guid.NewGuid(),
+            PickupRequestId = id,
+            EventType = "CANCELLED",
+            ActorId = entity.OwnerId,
+            EventAt = DateTimeOffset.UtcNow,
+            Notes = "Pickup request cancelled.",
+            IdempotencyKey = Guid.NewGuid().ToString("N")
+        });
+
+        await _db.SaveChangesAsync(ct);
+        return true;
     }
 
-    public Task<IReadOnlyList<PickupEventReadDto>> GetEventsAsync(Guid pickupRequestId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<PickupEventReadDto>> GetEventsAsync(Guid pickupRequestId, CancellationToken ct = default)
     {
-        var events = _events.Where(e => e.PickupRequestId == pickupRequestId).ToList();
-        return Task.FromResult<IReadOnlyList<PickupEventReadDto>>(events.AsReadOnly());
+        var events = await _db.PickupEvents
+            .AsNoTracking()
+            .Where(e => e.PickupRequestId == pickupRequestId)
+            .OrderBy(e => e.EventAt)
+            .ToListAsync(ct);
+
+        return events.Select(e => new PickupEventReadDto(
+            e.Id, e.PickupRequestId, e.EventType, e.ActorId, e.EventAt, e.Notes
+        )).ToList().AsReadOnly();
     }
 
-    public Task<PickupRequestReadDto?> RescheduleAsync(Guid id, RescheduleRequestDto request, CancellationToken ct = default)
+    public async Task<PickupRequestReadDto?> RescheduleAsync(Guid id, RescheduleRequestDto request, CancellationToken ct = default)
     {
-        var index = _pickups.FindIndex(p => p.Id == id);
-        if (index < 0) return Task.FromResult<PickupRequestReadDto?>(null);
+        var entity = await _db.PickupRequests.FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (entity is null) return null;
 
-        var existing = _pickups[index];
-        var updated = new PickupRequestReadDto(
-            existing.Id, existing.RecoveryProposalId, existing.CollectionSlotId,
-            existing.CollectorId, existing.OwnerId, existing.ScheduledStart, existing.ScheduledEnd,
-            "RESCHEDULE_REQUIRED", existing.CreatedAt, DateTimeOffset.UtcNow, existing.CollectionSlot);
-        _pickups[index] = updated;
+        if (entity.Status == "DELIVERED" || entity.Status == "CANCELLED")
+        {
+            throw new InvalidOperationException($"Cannot reschedule a pickup request with status {entity.Status}.");
+        }
 
-        _events.Add(new PickupEventReadDto(
-            Guid.NewGuid(), id, "RESCHEDULED", request.RequestedBy,
-            DateTimeOffset.UtcNow, $"Reschedule requested: {request.Reason}"));
+        var now = DateTimeOffset.UtcNow;
+        entity.Status = "RESCHEDULE_PENDING";
+        entity.UpdatedAt = now;
 
-        return Task.FromResult<PickupRequestReadDto?>(updated);
+        _db.PickupEvents.Add(new PickupEvent
+        {
+            Id = Guid.NewGuid(),
+            PickupRequestId = id,
+            EventType = "RESCHEDULE_REQUESTED",
+            ActorId = request.RequestedBy,
+            EventAt = now,
+            Notes = $"Reschedule requested: {request.Reason}",
+            IdempotencyKey = Guid.NewGuid().ToString("N")
+        });
+
+        await _db.SaveChangesAsync(ct);
+        return MapToDto(entity);
     }
+
+    public static bool IsValidStatusTransition(string currentStatus, string targetStatus)
+    {
+        if (currentStatus.Equals(targetStatus, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return (currentStatus.ToUpperInvariant(), targetStatus.ToUpperInvariant()) switch
+        {
+            ("DRAFT", "PLANNED") => true,
+            ("DRAFT", "CANCELLED") => true,
+
+            ("PLANNED", "PENDING_APPROVAL") => true,
+            ("PLANNED", "CANCELLED") => true,
+
+            ("PENDING_APPROVAL", "CONFIRMED") => true,
+            ("PENDING_APPROVAL", "CANCELLED") => true,
+
+            ("CONFIRMED", "ASSIGNED") => true,
+            ("CONFIRMED", "CANCELLED") => true,
+
+            ("ASSIGNED", "COLLECTED") => true,
+            ("ASSIGNED", "FAILED") => true,
+            ("ASSIGNED", "CANCELLED") => true,
+
+            ("COLLECTED", "DELIVERED") => true,
+            ("COLLECTED", "FAILED") => true,
+
+            ("FAILED", "RESCHEDULE_PENDING") => true,
+            ("FAILED", "CANCELLED") => true,
+
+            ("RESCHEDULE_PENDING", "PENDING_APPROVAL") => true,
+            ("RESCHEDULE_PENDING", "CANCELLED") => true,
+
+            _ => false
+        };
+    }
+
+    private static PickupRequestReadDto MapToDto(PickupRequest p) => new(
+        p.Id,
+        p.RecoveryProposalId,
+        p.CollectionSlotId,
+        p.CollectorId,
+        p.OwnerId,
+        p.ScheduledStart,
+        p.ScheduledEnd,
+        p.Status,
+        p.CreatedAt,
+        p.UpdatedAt,
+        p.CollectionSlot is null ? null : new CollectionSlotReadDto(
+            p.CollectionSlot.Id,
+            p.CollectionSlot.CollectorId,
+            p.CollectionSlot.StartsAt,
+            p.CollectionSlot.EndsAt,
+            p.CollectionSlot.ServiceArea,
+            p.CollectionSlot.Capacity,
+            p.CollectionSlot.ReservedCount,
+            p.CollectionSlot.VehicleClass,
+            p.CollectionSlot.Status,
+            p.CollectionSlot.CreatedAt,
+            p.CollectionSlot.UpdatedAt)
+    );
 }

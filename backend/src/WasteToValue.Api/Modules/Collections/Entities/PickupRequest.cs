@@ -11,6 +11,7 @@ public sealed class PickupRequest
     public DateTimeOffset ScheduledStart { get; set; }
     public DateTimeOffset ScheduledEnd { get; set; }
     public string Status { get; set; } = "CONFIRMED";
+    public string? VerificationCode { get; set; }
     public string IdempotencyKey { get; set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

@@ -1,26 +1,39 @@
 import 'package:flutter/material.dart';
+import '../services/collections_api_service.dart';
 
 const _forest = Color(0xFF2D674E);
 const _ink = Color(0xFF203B32);
 const _muted = Color(0xFF64745F);
 const _canvas = Color(0xFFF5F6F2);
 
-/// Dedicated handover screen with QR scanner placeholder, one-time code entry,
-/// and proof submission.
+/// Dedicated handover screen with QR scanner placeholder, real OTP verification,
+/// loading indicators, error handling, and proof submission.
 class HandoverScreen extends StatefulWidget {
-  const HandoverScreen({super.key, required this.pickupId, required this.itemName});
+  const HandoverScreen({super.key, required this.pickupId, required this.itemName, this.apiService});
   final String pickupId;
   final String itemName;
+  final CollectionsApiService? apiService;
 
   @override
   State<HandoverScreen> createState() => _HandoverScreenState();
 }
 
 class _HandoverScreenState extends State<HandoverScreen> {
+  late final CollectionsApiService _api;
   final _code = TextEditingController();
   final _notes = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  
+  bool _submitting = false;
   bool _submitted = false;
+  String? _errorMessage;
+  Map<String, dynamic>? _verifiedProof;
+
+  @override
+  void initState() {
+    super.initState();
+    _api = widget.apiService ?? CollectionsApiService();
+  }
 
   @override
   void dispose() {
@@ -33,6 +46,38 @@ class _HandoverScreenState extends State<HandoverScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _submitVerification() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _submitting = true;
+      _errorMessage = null;
+    });
+
+    final actorId = 'b1000000-0000-0000-0000-000000000001'; // Default collector actor ID
+
+    try {
+      final result = await _api.verifyHandoverCode(widget.pickupId, _code.text.trim(), actorId);
+      if (result != null) {
+        if (_notes.text.trim().isNotEmpty) {
+          await _api.submitHandoverProof(widget.pickupId, 'NOTE', actorId, storageKey: _notes.text.trim());
+        }
+
+        setState(() {
+          _submitted = true;
+          _verifiedProof = result;
+        });
+        _message('Handover code verified successfully! Status updated in backend.');
+      } else {
+        setState(() => _errorMessage = 'Invalid or expired verification code.');
+      }
+    } catch (e) {
+      setState(() => _errorMessage = 'Verification failed: ${e.toString().replaceAll('Exception:', '').trim()}');
+    } finally {
+      setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -57,7 +102,7 @@ class _HandoverScreenState extends State<HandoverScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(color: const Color(0xFFE7ECDE), borderRadius: BorderRadius.circular(8)),
-                  child: const Text('UI PREVIEW · No real verification\nCode validation requires the ASP.NET backend.', style: TextStyle(fontSize: 11, color: Color(0xFF586C48), height: 1.5)),
+                  child: const Text('API CONNECTED · Backend OTP Verification\nVerifies SHA-256 hashed 6-digit codes via ASP.NET Core API.', style: TextStyle(fontSize: 11, color: Color(0xFF586C48), height: 1.5)),
                 ),
                 const SizedBox(height: 22),
                 Text(widget.itemName, style: const TextStyle(fontSize: 28, fontFamily: 'serif', color: _ink)),
@@ -75,11 +120,11 @@ class _HandoverScreenState extends State<HandoverScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Column(children: <Widget>[
-                    Icon(Icons.qr_code_scanner, size: 48, color: _muted),
+                    Icon(Icons.qr_code_scanner, size: 48, color: _forest),
                     SizedBox(height: 16),
                     Text('QR Scanner', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: _ink)),
                     SizedBox(height: 8),
-                    Text('Camera integration is not connected.\nScan the QR code on the item to verify handover.', textAlign: TextAlign.center, style: TextStyle(color: _muted, fontSize: 12)),
+                    Text('Scan the QR code on the item or enter the 6-digit code below.', textAlign: TextAlign.center, style: TextStyle(color: _muted, fontSize: 12)),
                   ]),
                 ),
                 const SizedBox(height: 24),
@@ -94,6 +139,7 @@ class _HandoverScreenState extends State<HandoverScreen> {
                       controller: _code,
                       keyboardType: TextInputType.number,
                       maxLength: 6,
+                      enabled: !_submitting && !_submitted,
                       decoration: const InputDecoration(
                         labelText: 'Enter 6-digit code',
                         prefixIcon: Icon(Icons.pin_outlined),
@@ -105,28 +151,26 @@ class _HandoverScreenState extends State<HandoverScreen> {
                       controller: _notes,
                       maxLines: 3,
                       maxLength: 300,
+                      enabled: !_submitting && !_submitted,
                       decoration: const InputDecoration(
                         labelText: 'Handover notes (optional)',
                         prefixIcon: Icon(Icons.note_alt_outlined),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text('Photo capture is not connected.', style: TextStyle(color: _muted, fontSize: 11)),
+                    if (_errorMessage != null) ...<Widget>[
+                      const SizedBox(height: 8),
+                      Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                    ],
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        onPressed: () {
-                          if (_formKey.currentState!.validate()) {
-                            setState(() => _submitted = true);
-                            _message('Code format accepted. Verification unavailable without backend.');
-                          }
-                        },
-                        icon: const Icon(Icons.fact_check_outlined),
-                        label: const Text('Submit Verification'),
+                        onPressed: (_submitting || _submitted) ? null : _submitVerification,
+                        icon: _submitting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.fact_check_outlined),
+                        label: Text(_submitting ? 'Verifying...' : _submitted ? 'Verified' : 'Submit Verification'),
                       ),
                     ),
-                    if (_submitted) ...<Widget>[
+                    if (_submitted && _verifiedProof != null) ...<Widget>[
                       const SizedBox(height: 16),
                       Container(
                         padding: const EdgeInsets.all(14),
@@ -134,17 +178,27 @@ class _HandoverScreenState extends State<HandoverScreen> {
                           color: const Color(0xFFEAF0E3),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Row(children: <Widget>[
-                          Icon(Icons.check_circle_outline, color: _forest, size: 20),
-                          SizedBox(width: 10),
-                          Expanded(child: Text('Code format accepted for preview.\nBackend verification required to complete handover.', style: TextStyle(fontSize: 12, color: _forest))),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+                          const Row(children: <Widget>[
+                            Icon(Icons.check_circle_outline, color: _forest, size: 20),
+                            SizedBox(width: 10),
+                            Text('Handover Code Verified!', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _forest)),
+                          ]),
+                          const SizedBox(height: 6),
+                          Text('Proof ID: ${_verifiedProof!['id'] ?? 'Recorded'}', style: const TextStyle(fontSize: 12, color: _forest)),
+                          Text('Proof Type: ${_verifiedProof!['proofType'] ?? 'ONE_TIME_CODE'}', style: const TextStyle(fontSize: 12, color: _forest)),
+                          const SizedBox(height: 8),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Back to Pickup Details'),
+                          ),
                         ]),
                       ),
                     ],
                   ]),
                 )),
                 const SizedBox(height: 24),
-                const Text('Member 4 · Handover verification preview', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: _muted)),
+                const Text('Member 4 · Handover verification active', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: _muted)),
               ]),
             ),
           ),
