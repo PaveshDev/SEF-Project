@@ -28,7 +28,7 @@ public sealed class EfRecoveryRepository(IServiceProvider services, IConfigurati
             "updatedat" => query.SortDirection == "asc" ? source.OrderBy(x => x.UpdatedAt) : source.OrderByDescending(x => x.UpdatedAt),
             _ => query.SortDirection == "asc" ? source.OrderBy(x => x.CreatedAt) : source.OrderByDescending(x => x.CreatedAt)
         };
-        var items = await ordered.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToListAsync(ct);
+        var items = await ordered.ThenBy(x => x.Id).Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToListAsync(ct);
         return new(items, query.Page, query.PageSize, total);
     }
     public Task<bool> HasActiveCaseAsync(Guid itemId, Guid? exceptId, CancellationToken ct)
@@ -47,6 +47,9 @@ public sealed class EfRecoveryRepository(IServiceProvider services, IConfigurati
     {
         var source = Context.Set<ValueReference>().AsNoTracking();
         if (!includeUnverified) source = source.Where(x => x.IsVerified);
+        if (query.CategoryId is { } category) source = source.Where(x => x.CategoryId == category);
+        if (query.ObservedAfter is { } after) source = source.Where(x => x.ObservedAt >= after);
+        if (query.ObservedBefore is { } before) source = source.Where(x => x.ObservedAt <= before);
         if (query.Condition is { } condition) source = source.Where(x => x.Condition == condition);
         if (query.Route is { } route) source = source.Where(x => x.Route == route);
         if (!string.IsNullOrWhiteSpace(query.Currency)) source = source.Where(x => x.Currency == query.Currency);
@@ -57,7 +60,7 @@ public sealed class EfRecoveryRepository(IServiceProvider services, IConfigurati
             "sourcename" => query.SortDirection == "asc" ? source.OrderBy(x => x.SourceName) : source.OrderByDescending(x => x.SourceName),
             _ => query.SortDirection == "asc" ? source.OrderBy(x => x.ObservedAt) : source.OrderByDescending(x => x.ObservedAt)
         };
-        var items = await ordered.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToListAsync(ct);
+        var items = await ordered.ThenBy(x => x.Id).Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToListAsync(ct);
         return new(items, query.Page, query.PageSize, total);
     }
     public Task<ValueReference?> FindReferenceAsync(Guid id, CancellationToken ct)

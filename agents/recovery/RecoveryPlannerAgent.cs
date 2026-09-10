@@ -15,6 +15,7 @@ public enum RecoveryPlannerToolName
     RequestRecipientMatches,
     RequestPickupFeasibility,
     SaveRecoveryOptions,
+    FinalizeRecoveryOptions,
     CreateProposalDraft,
     RequestHumanApproval
 }
@@ -27,7 +28,12 @@ public sealed record RecoveryPlannerAgentInput(Guid RecoveryCaseId, string Objec
 
 public sealed record RecoveryPlannerValueReference(Guid ReferenceId, int Version,
     decimal ValueLow, decimal ValueHigh, string Currency, string SourceName,
-    DateTimeOffset ObservedAt);
+    DateTimeOffset ObservedAt, Guid? CategoryId = null, ConditionGrade? Condition = null,
+    RecoveryRoute? Route = null, bool IsVerified = false);
+
+public sealed record RecoveryPlannerFinalOption(Guid Id, int ExpectedVersion, Guid CaseId,
+    int CaseRevision, RecoveryRoute Route, ValueEstimate Estimate, IReadOnlyList<Guid> ReferenceIds,
+    MatchSummary? Match, PickupPlanSummary? Pickup);
 
 public sealed record RecoveryPlannerAlternative(RecoveryRoute Route,
     IReadOnlyList<Guid> ReferenceIds, ValueEstimationResult Valuation,
@@ -37,7 +43,7 @@ public sealed record RecoveryPlannerOptionDraft(Guid RecoveryCaseId, RecoveryRou
     decimal EstimatedNetValue, string Currency, IReadOnlyList<Guid> ReferenceIds);
 
 public sealed record RecoveryPlannerPersistedOption(Guid Id, Guid RecoveryCaseId,
-    RecoveryRoute Route, decimal EstimatedNetValue, string Currency, int Version);
+    RecoveryRoute Route, decimal EstimatedNetValue, string Currency, int Version, ValueEstimate? Estimate = null);
 
 public sealed record RecoveryPlannerProposalDraft(Guid RecoveryCaseId, int CaseRevision,
     IReadOnlyList<RecoveryPlannerAlternative> Alternatives, DateTimeOffset ExpiresAt)
@@ -84,6 +90,10 @@ public interface IRecoveryPlannerToolset
     Task<PlannerToolResult<IReadOnlyList<MatchSummary>>> RequestRecipientMatchesAsync(MatchRequest request, CancellationToken ct);
     Task<PlannerToolResult<IReadOnlyList<PickupPlanSummary>>> RequestPickupFeasibilityAsync(PickupPlanningRequest request, CancellationToken ct);
     Task<PlannerToolResult<IReadOnlyList<RecoveryPlannerPersistedOption>>> SaveRecoveryOptionsAsync(Guid runId, IReadOnlyList<RecoveryPlannerOptionDraft> options, CancellationToken ct);
+    Task<PlannerToolResult<IReadOnlyList<RecoveryPlannerPersistedOption>>> FinalizeRecoveryOptionsAsync(Guid runId,
+        IReadOnlyList<RecoveryPlannerFinalOption> options, CancellationToken ct)
+        => Task.FromResult(PlannerToolResult<IReadOnlyList<RecoveryPlannerPersistedOption>>.Failure(
+            new("option_finalization_unavailable", "Final option persistence is not configured.", false)));
     Task<PlannerToolResult<Guid>> CreateProposalDraftAsync(RecoveryPlannerProposalDraft draft, CancellationToken ct);
     Task<PlannerToolResult<bool>> RequestHumanApprovalAsync(Guid proposalId, CancellationToken ct);
 }
@@ -138,8 +148,9 @@ public static class RecoveryPlannerInputValidator
         if (InjectionMarkers.Any(marker => input.Objective.Contains(marker, StringComparison.OrdinalIgnoreCase)))
             throw RecoveryException.Invalid("Objective contains unsupported instruction content.");
         RecoveryRequestValidator.Currency(input.Currency);
-        if (input.PreferredRoutes is null || input.PreferredRoutes.Count == 0)
-            throw RecoveryException.Invalid("At least one preferred route is required.");
+        if (input.PreferredRoutes is null || input.PreferredRoutes.Count is < 1 or > 5 ||
+            input.PreferredRoutes.Distinct().Count() != input.PreferredRoutes.Count)
+            throw RecoveryException.Invalid("Choose one to five distinct preferred routes.");
         foreach (var route in input.PreferredRoutes) RecoveryRequestValidator.Defined(route);
         if (input.MaximumPickupCost is { } budget) RecoveryRequestValidator.Money(budget);
         if (input.Deadline is { } deadline && deadline <= DateTimeOffset.UtcNow)
@@ -150,7 +161,7 @@ public static class RecoveryPlannerInputValidator
 public sealed class RecoveryPlannerAgent(RecoveryPlannerToolset tools, RecoveryPlannerRuntimeOptions? options = null,
     TimeProvider? clock = null, IRecoveryWorkflowStore? workflows = null,
     IRecoveryActorAccessor? actors = null, IRecoveryCommandExecutor? commands = null,
-    IRecoveryReasoningProvider? reasoning = null)
+    IRecoveryReasoningProvider? reasoning = null, IRecoveryWorkflowApprovalAuthorizer? approvalAuthorizer = null)
 {
     private readonly RecoveryPlannerRuntimeOptions runtime = options ?? RecoveryPlannerRuntimeOptions.Default;
     private readonly TimeProvider time = clock ?? TimeProvider.System;
@@ -193,6 +204,8 @@ public sealed class RecoveryPlannerAgent(RecoveryPlannerToolset tools, RecoveryP
         {
             cancellationToken.ThrowIfCancellationRequested();
             RecoveryPlannerInputValidator.Validate(input);
+            RecoveryRequestValidator.Version(caseRevision);
+            RecoveryRequestValidator.Id(runId, "RunId");
             if (workflows is not null)
             {
                 var created = await workflows.CreateAsync(new RecoveryWorkflowState(runId, input.RecoveryCaseId,
@@ -210,6 +223,14 @@ public sealed class RecoveryPlannerAgent(RecoveryPlannerToolset tools, RecoveryP
             if (!assessment.IsSuccess || !assessment.Value!.IsCurrent ||
                 assessment.Value.Status != AssessmentStatus.Confirmed)
                 return await Fail(assessment.Error ?? new("assessment_stale", "Confirmed assessment is stale or does not match.", false, RecoveryPlannerToolName.GetConfirmedAssessment));
+            var currentAssessment = assessment.Value!;
+            RecoveryRequestValidator.Assessment(currentAssessment, input.Assessment.ItemId, input.Assessment.OwnerId);
+            if (currentAssessment.AssessmentId != input.Assessment.AssessmentId ||
+                currentAssessment.ItemRevision != input.Assessment.ItemRevision ||
+                currentAssessment.AssessmentVersion != input.Assessment.AssessmentVersion ||
+                currentAssessment.ConfirmedAt > time.GetUtcNow())
+                return await Fail(new("assessment_stale", "The confirmed assessment changed. Reload the case.", false));
+            input = input with { Assessment = currentAssessment };
 
             var references = await Call(invoker, RecoveryPlannerToolName.GetValueReferences,
                 (t, ct) => t.GetValueReferencesAsync(input.RecoveryCaseId, ct), used, cancellationToken);
@@ -218,8 +239,16 @@ public sealed class RecoveryPlannerAgent(RecoveryPlannerToolset tools, RecoveryP
             var alternatives = new List<RecoveryPlannerAlternative>();
             foreach (var route in input.PreferredRoutes)
             {
-                var reference = references.Value!.Where(x => x.Currency == input.Currency && x.ObservedAt <= time.GetUtcNow())
-                    .OrderByDescending(x => x.ObservedAt).FirstOrDefault();
+                if (route == RecoveryRoute.RepairThenReuse)
+                {
+                    warnings.Add("RepairThenReuse: verified repair quotation integration is unavailable.");
+                    continue;
+                }
+                var reference = references.Value!.Where(x => x.IsVerified && x.ReferenceId != Guid.Empty && x.Version > 0 &&
+                    x.CategoryId == currentAssessment.CategoryId && x.CategoryId != null && x.Condition == currentAssessment.Condition &&
+                    x.Route == route && x.Currency == input.Currency && x.ObservedAt <= time.GetUtcNow() &&
+                    time.GetUtcNow() - x.ObservedAt <= ValueEstimationService.MaximumReferenceAge)
+                    .OrderByDescending(x => x.ObservedAt).ThenBy(x => x.ReferenceId).FirstOrDefault();
                 if (reference is null) { warnings.Add($"{route}: verified value reference unavailable."); continue; }
                 var valuationInput = new ValueEstimationInput(reference.ValueLow, reference.ValueHigh, 0, 0,
                     input.Currency, route, reference.SourceName, reference.ObservedAt, Array.Empty<string>(), Array.Empty<string>());
@@ -243,23 +272,49 @@ public sealed class RecoveryPlannerAgent(RecoveryPlannerToolset tools, RecoveryP
                 if (alternative is null) continue;
                 var option = persistedByRoute[route];
                 var matchResult = await Call(invoker, RecoveryPlannerToolName.RequestRecipientMatches,
-                    (t, ct) => t.RequestRecipientMatchesAsync(new(Guid.NewGuid(), input.RecoveryCaseId, caseRevision,
+                    (t, ct) => t.RequestRecipientMatchesAsync(new(StepId(runId, caseRevision, route, "match"), input.RecoveryCaseId, caseRevision,
                         option.Id, option.Version, input.Assessment.ItemId, input.Assessment.AssessmentId,
                         input.Assessment.AssessmentVersion, input.Assessment.CategoryId ?? Guid.Empty,
                         input.Assessment.Condition, input.Assessment.Function, route, input.Assessment.ServiceArea, input.Deadline), ct), used, cancellationToken);
-                var match = matchResult.Value?.FirstOrDefault(x => x.RecoveryOptionId == option.Id &&
-                    x.Eligibility == MatchEligibility.Eligible && x.Response == PartnerResponse.Accepted);
+                var match = matchResult.IsSuccess ? matchResult.Value?.FirstOrDefault(x => x.RecoveryOptionId == option.Id &&
+                    x.MatchId != Guid.Empty && x.PartnerId != Guid.Empty && x.Version > 0 &&
+                    !string.IsNullOrWhiteSpace(x.FreshnessToken) && x.FreshnessToken.Length <= 500 &&
+                    x.CheckedAt != default && x.CheckedAt <= time.GetUtcNow() &&
+                    x.Eligibility == MatchEligibility.Eligible && x.Response == PartnerResponse.Accepted) : null;
                 if (match is null) { alternatives.Remove(alternative); warnings.Add($"{route}: eligible accepted match unavailable."); continue; }
                 var pickupResult = await Call(invoker, RecoveryPlannerToolName.RequestPickupFeasibility,
-                    (t, ct) => t.RequestPickupFeasibilityAsync(new(Guid.NewGuid(), input.RecoveryCaseId, caseRevision,
+                    (t, ct) => t.RequestPickupFeasibilityAsync(new(StepId(runId, caseRevision, route, "pickup"), input.RecoveryCaseId, caseRevision,
                         match.MatchId, match.Version, match.FreshnessToken, input.Assessment.ServiceArea, route,
                         Array.Empty<string>(), input.Deadline, input.MaximumPickupCost, input.Currency), ct), used, cancellationToken);
-                var pickup = pickupResult.Value?.FirstOrDefault(x => x.Feasibility == PickupFeasibility.Feasible);
+                var pickup = pickupResult.IsSuccess ? pickupResult.Value?.FirstOrDefault(x =>
+                    x.Feasibility == PickupFeasibility.Feasible && x.MatchId == match.MatchId &&
+                    x.PickupPlanId != Guid.Empty && x.Version > 0 && !string.IsNullOrWhiteSpace(x.FreshnessToken) &&
+                    x.FreshnessToken.Length <= 500 && x.CheckedAt != default && x.CheckedAt <= time.GetUtcNow() &&
+                    x.ProposedStart > time.GetUtcNow() && x.ProposedEnd > x.ProposedStart &&
+                    x.Currency == input.Currency && x.EstimatedCost >= 0 && x.EstimatedCost <= 9999999999.99m &&
+                    decimal.Round(x.EstimatedCost, 2) == x.EstimatedCost &&
+                    (input.MaximumPickupCost is null || x.EstimatedCost <= input.MaximumPickupCost) &&
+                    (input.Deadline is null || x.ProposedEnd <= input.Deadline)) : null;
                 if (pickup is null) { alternatives.Remove(alternative); warnings.Add($"{route}: feasible pickup unavailable."); continue; }
-                alternatives[alternatives.IndexOf(alternative)] = alternative with { Match = match, Pickup = pickup };
+                var priced = await Call(invoker, RecoveryPlannerToolName.CalculateRecoveryValue,
+                    (t, ct) => t.CalculateRecoveryValueAsync(alternative.Valuation.Inputs with {
+                        EstimatedPickupCost = pickup.EstimatedCost, CostCurrency = pickup.Currency }, ct), used, cancellationToken);
+                if (!priced.IsSuccess || priced.Value!.IsReferenceStale)
+                { alternatives.Remove(alternative); warnings.Add($"{route}: valid final valuation unavailable."); continue; }
+                alternatives[alternatives.IndexOf(alternative)] = alternative with { Match = match, Pickup = pickup, Valuation = priced.Value! };
             }
             if (alternatives.Count == 0)
                 return await Fail(new("no_feasible_alternatives", "No feasible Recovery alternatives were produced.", false));
+            var finalized = await Call(invoker, RecoveryPlannerToolName.FinalizeRecoveryOptions,
+                (t, ct) => t.FinalizeRecoveryOptionsAsync(runId, alternatives.Select(x => new RecoveryPlannerFinalOption(
+                    persistedByRoute[x.Route].Id, persistedByRoute[x.Route].Version, input.RecoveryCaseId, caseRevision,
+                    x.Route, x.Valuation.ToEstimate(), x.ReferenceIds, x.Match, x.Pickup)).ToArray(), ct), used, cancellationToken);
+            if (!finalized.IsSuccess) return await Fail(finalized.Error!);
+            var finalOptions = ValidatePersistedOptions(input.RecoveryCaseId, alternatives, finalized.Value!);
+            if (finalOptions.Any(x => x.Id != persistedByRoute[x.Route].Id || x.Version < persistedByRoute[x.Route].Version ||
+                x.Estimate != alternatives.Single(a => a.Route == x.Route).Valuation.ToEstimate()))
+                return await Fail(new("invalid_persisted_options", "Finalization changed authoritative option identity.", false));
+            persistedByRoute = finalOptions.ToDictionary(x => x.Route);
             var reasoningRequest = CreateReasoningRequest(input, assessment.Value!, alternatives, persistedByRoute);
             GatewayResult<RecoveryReasoningResponse> reasoned;
             try
@@ -298,9 +353,12 @@ public sealed class RecoveryPlannerAgent(RecoveryPlannerToolset tools, RecoveryP
             if (!reasoningRecorded.IsSuccess) return await Fail(reasoningRecorded.Error!);
             if (alternatives.Count == 0)
                 return await Fail(new("IntegrationUnavailable", "Reasoning is unavailable and no valid deterministic fallback exists.", true));
+            var expiresAt = time.GetUtcNow().Add(runtime.ProposalLifetime);
+            if (input.Deadline is { } limit && expiresAt > limit) expiresAt = limit;
+            if (expiresAt <= time.GetUtcNow()) return await Fail(new("deadline_passed", "The recovery deadline has passed.", false));
             var proposal = await Call(invoker, RecoveryPlannerToolName.CreateProposalDraft,
                 (t, ct) => t.CreateProposalDraftAsync(new(input.RecoveryCaseId, caseRevision, alternatives,
-                    time.GetUtcNow().Add(runtime.ProposalLifetime)) { Recommendation = recommendation }, ct), used, cancellationToken);
+                    expiresAt) { Recommendation = recommendation }, ct), used, cancellationToken);
             if (!proposal.IsSuccess) return await Fail(proposal.Error!);
             var approval = await Call(invoker, RecoveryPlannerToolName.RequestHumanApproval,
                 (t, ct) => t.RequestHumanApprovalAsync(proposal.Value, ct), used, cancellationToken);
@@ -309,7 +367,7 @@ public sealed class RecoveryPlannerAgent(RecoveryPlannerToolset tools, RecoveryP
             if (workflows is not null)
             {
                 var waiting = await workflows.MarkWaitingForApprovalAsync(runId, proposal.Value, caseRevision,
-                    time.GetUtcNow().Add(runtime.ProposalLifetime), cancellationToken);
+                    expiresAt, cancellationToken);
                 if (!waiting.IsSuccess) return await Fail(waiting.Error!);
             }
             var success = Success(input, runId, started, used, warnings, alternatives, proposal.Value);
@@ -337,9 +395,9 @@ public sealed class RecoveryPlannerAgent(RecoveryPlannerToolset tools, RecoveryP
         new(input.RecoveryCaseId, assessment.CategoryId?.ToString() ?? "Unknown",
             new(assessment.Function, assessment.EvidenceReferences.ToArray()), assessment.Condition,
             alternatives.Select(option => new RecoveryReasoningOption(persisted[option.Route].Id, option.Route,
-                new(option.Valuation.Inputs.EstimatedProceedsLow, option.Valuation.Inputs.EstimatedProceedsHigh,
+                new(option.Valuation.ToEstimate().ValueLow, option.Valuation.ToEstimate().ValueHigh,
                     option.Valuation.EstimatedRepairCost, option.Valuation.EstimatedPickupCost,
-                    option.Valuation.EstimatedNetValue, option.Valuation.Currency),
+                    option.Valuation.ToEstimate().NetValue, option.Valuation.Currency, option.Valuation.ToEstimate().Shortfall),
                 option.ReferenceIds.Select(id => id.ToString()).ToArray(),
                 option.Match is null ? null : new(option.Match.Eligibility.ToString(), option.Match.Response.ToString()),
                 option.Pickup is null ? null : new(option.Pickup.Feasibility.ToString(), option.Pickup.EstimatedCost,
@@ -393,6 +451,8 @@ public sealed class RecoveryPlannerAgent(RecoveryPlannerToolset tools, RecoveryP
         {
             if (workflows is null || actors is null || commands is null)
                 return RecoveryWorkflowResult<RecoveryWorkflowState>.Failure("workflow_resume_unavailable", "Workflow resume infrastructure is not configured.", true);
+            if (approvalAuthorizer is null)
+                return RecoveryWorkflowResult<RecoveryWorkflowState>.Failure("approval_authorization_unavailable", "Authoritative approval verification is not configured.", true);
             var actor = await actors.GetAsync(cancellationToken);
             RecoveryAccess.Human(actor);
             var command = RecoveryCommand.Create(actor, "resume_recovery_workflow",
@@ -410,6 +470,7 @@ public sealed class RecoveryPlannerAgent(RecoveryPlannerToolset tools, RecoveryP
                     throw RecoveryException.Conflict("proposal_revision_mismatch", "Approval targets a different proposal revision.");
                 if (loaded.Value.ProposalExpiresAt is { } expiry && time.GetUtcNow() >= expiry)
                     throw RecoveryException.Conflict("proposal_expired", "The proposal has expired.");
+                await approvalAuthorizer.AuthorizeAsync(loaded.Value, decision, token);
             }, async token =>
             {
                 var recorded = await workflows.RecordAuthorizedApprovalDecisionAsync(workflowId, decision, token);
@@ -441,11 +502,15 @@ public sealed class RecoveryPlannerAgent(RecoveryPlannerToolset tools, RecoveryP
         {
             var option = persisted.SingleOrDefault(item => item.Route == alternative.Route);
             if (option is null || option.RecoveryCaseId == Guid.Empty || option.RecoveryCaseId != caseId || option.Currency != alternative.Valuation.Currency ||
-                option.EstimatedNetValue != alternative.Valuation.EstimatedNetValue)
+                option.EstimatedNetValue != alternative.Valuation.ToEstimate().NetValue)
                 throw RecoveryException.Conflict("invalid_persisted_options", "Persisted options do not correspond to the planner drafts.");
         }
         return persisted;
     }
+
+    private static Guid StepId(Guid runId, int revision, RecoveryRoute route, string step)
+        => new(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(
+            $"{runId:D}|{revision}|{route}|{step}")).AsSpan(0, 16));
 
     private async Task<PlannerToolResult<T>> Call<T>(RecoveryPlannerToolInvoker invoker, RecoveryPlannerToolName name,
         Func<IRecoveryPlannerToolset, CancellationToken, Task<PlannerToolResult<T>>> operation,
@@ -476,6 +541,7 @@ public sealed class RecoveryPlannerToolset(IRecoveryPlannerToolset inner, ValueE
     public Task<PlannerToolResult<IReadOnlyList<MatchSummary>>> RequestRecipientMatchesAsync(MatchRequest request, CancellationToken ct) => inner.RequestRecipientMatchesAsync(request, ct);
     public Task<PlannerToolResult<IReadOnlyList<PickupPlanSummary>>> RequestPickupFeasibilityAsync(PickupPlanningRequest request, CancellationToken ct) => inner.RequestPickupFeasibilityAsync(request, ct);
     public Task<PlannerToolResult<IReadOnlyList<RecoveryPlannerPersistedOption>>> SaveRecoveryOptionsAsync(Guid runId, IReadOnlyList<RecoveryPlannerOptionDraft> options, CancellationToken ct) => inner.SaveRecoveryOptionsAsync(runId, options, ct);
+    public Task<PlannerToolResult<IReadOnlyList<RecoveryPlannerPersistedOption>>> FinalizeRecoveryOptionsAsync(Guid runId, IReadOnlyList<RecoveryPlannerFinalOption> options, CancellationToken ct) => inner.FinalizeRecoveryOptionsAsync(runId, options, ct);
     public Task<PlannerToolResult<Guid>> CreateProposalDraftAsync(RecoveryPlannerProposalDraft draft, CancellationToken ct) => inner.CreateProposalDraftAsync(draft, ct);
     public Task<PlannerToolResult<bool>> RequestHumanApprovalAsync(Guid proposalId, CancellationToken ct) => inner.RequestHumanApprovalAsync(proposalId, ct);
 }

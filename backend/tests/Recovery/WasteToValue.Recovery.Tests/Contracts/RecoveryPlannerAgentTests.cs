@@ -87,7 +87,7 @@ public sealed partial class RecoveryPlannerAgentTests
         {
             Match() with { RecoveryOptionId = optionId }
         });
-        tools.PickupResult = PlannerToolResult<IReadOnlyList<PickupPlanSummary>>.Success(new[] { Pickup() });
+        tools.PickupResult = PlannerToolResult<IReadOnlyList<PickupPlanSummary>>.Success(new[] { Pickup() with { MatchId = tools.MatchesResult.Value![0].MatchId } });
 
         var result = await CreateAgent(tools).RunAsync(input, 1, Guid.NewGuid(), default);
 
@@ -157,7 +157,6 @@ public sealed partial class RecoveryPlannerAgentTests
     [Theory]
     [InlineData(RecoveryRoute.Donate)]
     [InlineData(RecoveryRoute.Resell)]
-    [InlineData(RecoveryRoute.RepairThenReuse)]
     [InlineData(RecoveryRoute.Recycle)]
     public async Task All_non_reuse_routes_use_authoritative_option_ids(RecoveryRoute route)
     {
@@ -379,7 +378,13 @@ public sealed partial class RecoveryPlannerAgentTests
         IRecoveryActorAccessor? actors = null, IRecoveryCommandExecutor? commands = null,
         IRecoveryReasoningProvider? reasoning = null) =>
         new(new RecoveryPlannerToolset(tools, new ValueEstimationService()), options,
-            new FixedTimeProvider(DateTimeOffset.UtcNow.AddMinutes(1)), workflows, actors, commands, reasoning);
+            new FixedTimeProvider(DateTimeOffset.UtcNow.AddMinutes(1)), workflows, actors, commands, reasoning, new AuthorizedTestApproval());
+
+    private sealed class AuthorizedTestApproval : IRecoveryWorkflowApprovalAuthorizer
+    {
+        public Task AuthorizeAsync(RecoveryWorkflowState state, RecoveryApprovalDecision decision, CancellationToken ct)
+        { ct.ThrowIfCancellationRequested(); return Task.CompletedTask; }
+    }
 
     private static RecoveryWorkflowState StoredWorkflow(Guid workflowId, Guid proposalId,
         int proposalRevision, DateTimeOffset proposalExpiresAt) => new(workflowId, Guid.NewGuid(),
@@ -395,7 +400,7 @@ public sealed partial class RecoveryPlannerAgentTests
     private static RecoveryPlannerAgentInput Input(RecoveryRoute route = RecoveryRoute.Reuse,
         string objective = "Keep the item useful")
     {
-        var assessment = new AssessmentSummary(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+        var assessment = new AssessmentSummary(Guid.Parse("10000000-0000-0000-0000-000000000001"), Guid.Parse("10000000-0000-0000-0000-000000000002"), Guid.Parse("10000000-0000-0000-0000-000000000003"), Guid.Parse("10000000-0000-0000-0000-000000000004"),
             1, 1, true, AssessmentStatus.Confirmed, ConditionGrade.Good, FunctionalStatus.Working,
             DateTimeOffset.UtcNow, "General service area", Array.Empty<string>());
         return new(Guid.NewGuid(), objective, assessment, new[] { route }, 50m, "LKR", DateTimeOffset.UtcNow.AddDays(1));
@@ -420,10 +425,8 @@ public sealed partial class RecoveryPlannerAgentTests
     {
         public PlannerToolResult<AssessmentSummary> AssessmentResult { get; init; } = PlannerToolResult<AssessmentSummary>.Success(Input().Assessment);
         public PlannerToolResult<IReadOnlyList<RecoveryPlannerValueReference>> ReferencesResult { get; init; } =
-            PlannerToolResult<IReadOnlyList<RecoveryPlannerValueReference>>.Success(new[]
-            {
-                new RecoveryPlannerValueReference(Guid.NewGuid(), 1, 100, 120, "LKR", "Verified reference", DateTimeOffset.UtcNow)
-            });
+            PlannerToolResult<IReadOnlyList<RecoveryPlannerValueReference>>.Success(Enum.GetValues<RecoveryRoute>().Select(route =>
+                new RecoveryPlannerValueReference(Guid.NewGuid(), 1, 100, 120, "LKR", "Verified reference", DateTimeOffset.UtcNow, Input().Assessment.CategoryId, ConditionGrade.Good, route, true)).ToArray());
         public PlannerToolResult<IReadOnlyList<MatchSummary>> MatchesResult { get; set; } =
             PlannerToolResult<IReadOnlyList<MatchSummary>>.Success(Array.Empty<MatchSummary>());
         public PlannerToolResult<IReadOnlyList<PickupPlanSummary>> PickupResult { get; set; } =
@@ -475,6 +478,12 @@ public sealed partial class RecoveryPlannerAgentTests
             PersistedOptionIds.AddRange(created.Select(option => option.Id));
             persistedByRun[runId] = created;
             return Task.FromResult(PlannerToolResult<IReadOnlyList<RecoveryPlannerPersistedOption>>.Success(created));
+        }
+        public Task<PlannerToolResult<IReadOnlyList<RecoveryPlannerPersistedOption>>> FinalizeRecoveryOptionsAsync(Guid runId, IReadOnlyList<RecoveryPlannerFinalOption> options, CancellationToken ct)
+        {
+            var values = options.Select(option => new RecoveryPlannerPersistedOption(option.Id, option.CaseId, option.Route,
+                option.Estimate.NetValue, option.Estimate.Currency, option.ExpectedVersion + 1, option.Estimate)).ToArray();
+            return Task.FromResult(PlannerToolResult<IReadOnlyList<RecoveryPlannerPersistedOption>>.Success(values));
         }
         public Task<PlannerToolResult<Guid>> CreateProposalDraftAsync(RecoveryPlannerProposalDraft draft, CancellationToken ct)
         {

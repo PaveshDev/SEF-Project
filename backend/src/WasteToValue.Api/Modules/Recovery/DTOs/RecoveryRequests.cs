@@ -23,4 +23,5 @@ public sealed record RecoveryCaseQuery(string? Search, RecoveryCaseStatus? Statu
     string? SortBy = "createdAt", string? SortDirection = "desc", int Page = 1, int PageSize = 25);
 public sealed record ValueReferenceQuery(string? Search, ConditionGrade? Condition,
     RecoveryRoute? Route, string? Currency, string? SortBy = "observedAt",
-    string? SortDirection = "desc", int Page = 1, int PageSize = 25);
+    string? SortDirection = "desc", int Page = 1, int PageSize = 25,
+    Guid? CategoryId = null, DateTimeOffset? ObservedAfter = null, DateTimeOffset? ObservedBefore = null);

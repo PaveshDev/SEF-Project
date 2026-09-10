@@ -36,6 +36,10 @@ public sealed class RecoveryPlanningService(RecoveryAccess access, IRecoveryRepo
     {
         var actor = await access.ActorAsync(ct);
         ValidateQuery(query.Page, query.PageSize, query.SortDirection);
+        if (query.SortBy is not null && !new[] { "createdat", "updatedat", "status" }.Contains(query.SortBy.ToLowerInvariant()))
+            throw RecoveryException.Invalid("SortBy must be createdAt, updatedAt or status.");
+        if (query.Search?.Length > 1000) throw RecoveryException.Invalid("Search must not exceed 1000 characters.");
+        if (query.Status is { } status) Defined(status);
         var result = await repository.ListCasesAsync(actor.UserId, query, ct);
         return new(result.Items.Select(RecoveryCaseResponse.From).ToArray(), result.Page, result.PageSize, result.TotalCount);
     }
@@ -54,15 +58,20 @@ public sealed class RecoveryPlanningService(RecoveryAccess access, IRecoveryRepo
                 value.UpdateInputs(request.ExpectedVersion, request.Inputs,
                     Require(await assessments.GetCurrentAsync(value.ItemId, token)), time.GetUtcNow());
                 foreach (var option in await repository.ListOptionsAsync(id, token)) option.MarkStale(time.GetUtcNow());
+                foreach (var proposal in await repository.ListProposalsAsync(id, token))
+                    if (proposal.Status == RecoveryProposalStatus.AwaitingApproval) proposal.MarkStale(time.GetUtcNow());
                 await repository.SaveAsync(token);
                 return RecoveryCaseResponse.From(value);
             }, ct);
     }
 
-    public async Task<PlanningResponse> PlanAsync(Guid id, StartPlanningRequest request, string key, CancellationToken ct)
+    public Task<PlanningResponse> PlanAsync(Guid id, StartPlanningRequest request, string key, CancellationToken ct)
+        => PlanCoreAsync(id, request, key, false, ct);
+
+    private async Task<PlanningResponse> PlanCoreAsync(Guid id, StartPlanningRequest request, string key, bool replan, CancellationToken ct)
     {
         var actor = await access.ActorAsync(ct); RecoveryAccess.Human(actor);
-        var command = RecoveryCommand.Create(actor, "plan", key, new { id, request });
+        var command = RecoveryCommand.Create(actor, replan ? "replan" : "plan", key, new { id, request });
         return await commands.ExecuteAsync(command, async token => { await access.OwnCaseAsync(id, actor, token); },
             async token =>
             {
@@ -72,13 +81,21 @@ public sealed class RecoveryPlanningService(RecoveryAccess access, IRecoveryRepo
                 value.RequireAssessment(assessment);
                 if (await repository.HasActiveCaseAsync(value.ItemId, id, token))
                     throw RecoveryException.Conflict("active_case_exists", "Another active case prevents retrying this case.");
-                value.StartPlanning(request.ExpectedVersion, time.GetUtcNow());
+                if (replan)
+                {
+                    value.PrepareReplan(request.ExpectedVersion, time.GetUtcNow());
+                    foreach (var proposal in await repository.ListProposalsAsync(id, token))
+                        if (proposal.Status == RecoveryProposalStatus.AwaitingApproval) proposal.MarkStale(time.GetUtcNow());
+                }
+                value.StartPlanning(value.Version, time.GetUtcNow());
                 foreach (var old in await repository.ListOptionsAsync(id, token)) old.MarkStale(time.GetUtcNow());
-                var references = (await repository.ListReferencesAsync(new ValueReferenceQuery(null, null, null, value.Currency), false, token)).Items;
                 var options = new List<RecoveryOption>();
                 var missing = new List<string>();
                 foreach (var route in value.PreferredRoutes)
                 {
+                    var references = (await repository.ListReferencesAsync(new ValueReferenceQuery(null,
+                        assessment.Condition, route, value.Currency, PageSize: 1, CategoryId: assessment.CategoryId,
+                        ObservedAfter: time.GetUtcNow() - ValueEstimationService.MaximumReferenceAge, ObservedBefore: time.GetUtcNow()), false, token)).Items;
                     // Initial workflow supports owner reuse and managed partner transfer.
                     // Repair quotations are not fabricated from gross value references.
                     var transfer = route != RecoveryRoute.Reuse;
@@ -112,7 +129,8 @@ public sealed class RecoveryPlanningService(RecoveryAccess access, IRecoveryRepo
                         catch (RecoveryException ex) when (ex.Status is 400 or 409) { missing.Add($"{route}: {ex.Code}"); continue; }
                     }
                     option.RecordIntegration(match, pickup);
-                    option.ValidateEstimate(valuation.Calculate(reference.ValueLow, reference.ValueHigh, 0,
+                    option.ValidateEstimate(valuation.Calculate(route == RecoveryRoute.Donate ? 0 : reference.ValueLow,
+                        route == RecoveryRoute.Donate ? 0 : reference.ValueHigh, 0,
                         pickup?.EstimatedCost ?? 0, value.Currency, pickup?.Currency ?? value.Currency),
                         new[] { reference.Snapshot() }, time.GetUtcNow());
                 }
@@ -146,7 +164,7 @@ public sealed class RecoveryPlanningService(RecoveryAccess access, IRecoveryRepo
     }
 
     public Task<PlanningResponse> ReplanAsync(Guid id, StartPlanningRequest request, string key, CancellationToken ct)
-        => PlanAsync(id, request, key, ct);
+        => PlanCoreAsync(id, request, key, true, ct);
 
     public async Task DeleteAsync(Guid id, string key, CancellationToken ct)
     {
@@ -162,6 +180,8 @@ public sealed class RecoveryPlanningService(RecoveryAccess access, IRecoveryRepo
                     throw RecoveryException.Conflict("case_not_deletable", "This recovery case has business history and cannot be deleted.");
                 if (await repository.HasProposalsAsync(id, token))
                     throw RecoveryException.Conflict("case_history_exists", "Cases with proposal history cannot be deleted.");
+                if ((await repository.ListOptionsAsync(id, token)).Count > 0)
+                    throw RecoveryException.Conflict("case_history_exists", "Cases with option history cannot be deleted. Cancel the case instead when permitted.");
                 repository.Remove(value); await repository.SaveAsync(token);
                 return true;
             }, ct);
@@ -169,7 +189,7 @@ public sealed class RecoveryPlanningService(RecoveryAccess access, IRecoveryRepo
 
     private static void ValidateQuery(int page, int pageSize, string? direction)
     {
-        if (page < 1 || pageSize is < 1 or > 100) throw RecoveryException.Invalid("Page must be positive and page size must be between 1 and 100.");
+        if (page < 1 || pageSize is < 1 or > 100 || (long)(page - 1) * pageSize > int.MaxValue) throw RecoveryException.Invalid("Page must be positive and page size must be between 1 and 100.");
         if (direction is not null && direction is not ("asc" or "desc")) throw RecoveryException.Invalid("Sort direction must be asc or desc.");
     }
 }

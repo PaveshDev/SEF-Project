@@ -12,6 +12,13 @@ public sealed class ProposalDecisionService(RecoveryAccess access, IRecoveryRepo
     IRecoveryCommandExecutor commands, IAssessmentGateway assessments, IMatchingGateway matching,
     IPickupPlanningGateway pickups, TimeProvider time) : IProposalDecisionService
 {
+    public async Task<IReadOnlyList<RecoveryProposalResponse>> ListAsync(Guid caseId, CancellationToken ct)
+    {
+        await access.OwnCaseAsync(caseId, await access.ActorAsync(ct), ct);
+        return (await repository.ListProposalsAsync(caseId, ct)).OrderByDescending(p => p.Revision)
+            .Select(RecoveryProposalResponse.From).ToArray();
+    }
+
     public async Task<RecoveryProposalResponse> SubmitAsync(Guid caseId, SubmitProposalRequest request, string key, CancellationToken ct)
     {
         var actor = await access.ActorAsync(ct); RecoveryAccess.Human(actor);
@@ -119,6 +126,7 @@ public sealed class ProposalDecisionService(RecoveryAccess access, IRecoveryRepo
         {
             var reference = await repository.FindReferenceAsync(evidence.ReferenceId, ct);
             if (reference is null || !reference.IsVerified || reference.Version != evidence.Version ||
+                reference.ObservedAt > time.GetUtcNow() || time.GetUtcNow() - reference.ObservedAt > ValueEstimationService.MaximumReferenceAge ||
                 reference.Snapshot() != evidence)
                 throw RecoveryException.Conflict("stale_evidence", "A value reference changed or is unavailable.");
         }

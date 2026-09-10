@@ -26,6 +26,55 @@ class RecoveryController extends ChangeNotifier {
   RecoveryCase? selectedCase;
   RecoveryProposal? proposal;
   String? proposalId;
+  List<RecoveryProposal> proposalHistory = const [];
+  String search = '';
+  String status = '';
+  int page = 1;
+  Map<String, String> fieldErrors = {};
+  bool get hasPendingProposal => proposalHistory.any((p) =>
+      p.status == RecoveryProposalStatus.awaitingApproval &&
+      p.caseRevision == selectedCase?.revision);
+  bool get canEdit =>
+      !isBusy &&
+      [
+        RecoveryCaseStatus.draft,
+        RecoveryCaseStatus.revisionRequested,
+        RecoveryCaseStatus.planning,
+        RecoveryCaseStatus.awaitingInputs,
+        RecoveryCaseStatus.awaitingApproval
+      ].contains(selectedCase?.status);
+  bool get canPlan =>
+      !isBusy &&
+      !workflowBlocked &&
+      [
+        RecoveryCaseStatus.draft,
+        RecoveryCaseStatus.planning,
+        RecoveryCaseStatus.awaitingApproval,
+        RecoveryCaseStatus.awaitingInputs,
+        RecoveryCaseStatus.revisionRequested,
+        RecoveryCaseStatus.failed
+      ].contains(selectedCase?.status);
+  bool get canCancel =>
+      !isBusy &&
+      !workflowBlocked &&
+      [
+        RecoveryCaseStatus.draft,
+        RecoveryCaseStatus.planning,
+        RecoveryCaseStatus.awaitingInputs,
+        RecoveryCaseStatus.awaitingApproval,
+        RecoveryCaseStatus.revisionRequested
+      ].contains(selectedCase?.status);
+  bool get canDelete =>
+      !isBusy &&
+      !workflowBlocked &&
+      options.isEmpty &&
+      proposalHistory.isEmpty &&
+      [
+        RecoveryCaseStatus.draft,
+        RecoveryCaseStatus.failed,
+        RecoveryCaseStatus.rejected,
+        RecoveryCaseStatus.cancelled
+      ].contains(selectedCase?.status);
   List<RecoveryOption> options = const [];
   List<String> unavailableInputs = const [];
   RecoveryOption? selectedOption;
@@ -41,7 +90,7 @@ class RecoveryController extends ChangeNotifier {
   bool get canCreateProposal =>
       !isBusy &&
       !workflowBlocked &&
-      proposalId == null &&
+      !hasPendingProposal &&
       selectedOption != null &&
       options.contains(selectedOption) &&
       optionUnavailable(selectedOption!, selectedCase) == null;
@@ -76,6 +125,7 @@ class RecoveryController extends ChangeNotifier {
     state = RecoveryLoadState.loading;
     errorMessage = null;
     successMessage = null;
+    fieldErrors = {};
     _notify();
     try {
       await action();
@@ -86,6 +136,22 @@ class RecoveryController extends ChangeNotifier {
       workflowBlocked = true;
       selectedOption = null;
       errorMessage = _message(error);
+      if (error is DioException && error.response?.data is Map) {
+        final errors = (error.response!.data as Map)['errors'];
+        if (errors is Map) {
+          for (final key in errors.keys) {
+            final name = key.toString().split('.').last;
+            if (name.isNotEmpty) {
+              fieldErrors[name[0].toLowerCase() + name.substring(1)] =
+                  'The server rejected this field. Check the value.';
+            }
+          }
+        }
+      }
+      if (successMessage != null) {
+        errorMessage =
+            '$successMessage The refresh failed. Reload to recover the saved operation.';
+      }
       state = error is DioException
           ? error.response?.statusCode == 401 ||
                   error.response?.statusCode == 403
@@ -103,16 +169,21 @@ class RecoveryController extends ChangeNotifier {
     }
   }
 
-  Future<void> loadCases(
-          {String search = '', String status = '', int page = 1}) =>
+  Future<void> loadCases({String? search, String? status, int? page}) =>
       _run(() async {
-        cases =
-            await service.listCases(search: search, status: status, page: page);
+        if (search != null) this.search = search;
+        if (status != null) this.status = status;
+        if (page != null) this.page = page;
+        if ((search != null || status != null) && page == null) this.page = 1;
+        cases = await _list();
       });
+  Future<RecoveryPage<RecoveryCase>> _list() =>
+      service.listCases(search: search, status: status, page: page);
 
   void _clearWorkflow() {
     proposal = null;
     proposalId = null;
+    proposalHistory = const [];
     selectedOption = null;
     options = const [];
     unavailableInputs = const [];
@@ -137,7 +208,7 @@ class RecoveryController extends ChangeNotifier {
   Future<void> createCase({
     required String itemId,
     required String objective,
-    required RecoveryRoute route,
+    required List<RecoveryRoute> routes,
     required String currency,
     double? budget,
     DateTime? deadline,
@@ -146,21 +217,20 @@ class RecoveryController extends ChangeNotifier {
         final created = await service.createCase(
             itemId: itemId,
             objective: objective,
-            route: route,
+            routes: routes,
             currency: currency,
             budget: budget,
             deadline: deadline);
         _clearWorkflow();
         selectedCase = created;
-        cases = await service.listCases();
         successMessage = 'Case created.';
+        cases = await _list();
       });
 
   Future<void> plan({bool replan = false}) async {
     final item = selectedCase;
     if (item == null || workflowBlocked) return;
     await _run(() async {
-      _clearWorkflow();
       final result = await service.planCase(item, replan: replan);
       final caseJson = result['case'];
       if (caseJson is! Map<String, dynamic>) throw const FormatException();
@@ -176,6 +246,7 @@ class RecoveryController extends ChangeNotifier {
               .map(RecoveryOption.fromJson)
               .toList()
           : await service.getOptions(item.id);
+      await _refresh();
       workflowBlocked = false;
       successMessage =
           'Planning completed. Select an eligible option to prepare a proposal.';
@@ -187,19 +258,26 @@ class RecoveryController extends ChangeNotifier {
     if (item == null) return;
     final current = await service.getCase(item.id);
     final values = await service.getOptions(item.id);
-    final loaded =
-        proposalId == null ? null : await service.getProposal(proposalId!);
+    final history = await service.listProposals(item.id);
+    if (history.any((p) => p.caseId != item.id)) throw const FormatException();
+    final matching = history.where((p) => p.id == proposalId);
+    final loaded = matching.isNotEmpty
+        ? matching.first
+        : history.isNotEmpty
+            ? history.first
+            : null;
     if (current.id != item.id ||
-        (loaded != null &&
-            (loaded.id != proposalId || loaded.caseId != item.id))) {
+        (loaded != null && (loaded.caseId != item.id))) {
       throw const FormatException();
     }
     selectedCase = current;
     options = values;
     proposal = loaded;
+    proposalId = loaded?.id;
+    proposalHistory = history;
     selectedOption = null;
     workflowBlocked = false;
-    cases = await service.listCases();
+    cases = await _list();
   }
 
   Future<void> refreshWorkflow() => _run(_refresh);
@@ -207,7 +285,7 @@ class RecoveryController extends ChangeNotifier {
   void selectOption(RecoveryOption option) {
     if (isBusy ||
         workflowBlocked ||
-        proposalId != null ||
+        hasPendingProposal ||
         !options.contains(option) ||
         optionUnavailable(option, selectedCase) != null) return;
     selectedOption = option;
@@ -218,7 +296,10 @@ class RecoveryController extends ChangeNotifier {
       {required DateTime expiresAt, required String explanation}) async {
     if (!canCreateProposal ||
         !expiresAt.isAfter(DateTime.now()) ||
-        explanation.trim().isEmpty) return;
+        explanation.trim().isEmpty ||
+        explanation.trim().length > 4000 ||
+        (selectedCase?.deadline != null &&
+            expiresAt.isAfter(selectedCase!.deadline!))) return;
     final item = selectedCase!;
     final option = selectedOption!;
     await _run(() async {
@@ -242,6 +323,8 @@ class RecoveryController extends ChangeNotifier {
           created.caseId != item.id ||
           created.optionId != option.id) throw const FormatException();
       proposalId = created.id;
+      proposal = created;
+      successMessage = 'Proposal saved.';
       await _refresh();
       successMessage = 'Proposal created and loaded for review.';
     });
@@ -261,10 +344,40 @@ class RecoveryController extends ChangeNotifier {
           revision: value.revision,
           decision: decision,
           comment: comment?.trim().isEmpty == true ? null : comment?.trim());
+      successMessage = 'Decision saved.';
       await _refresh();
       successMessage =
           'Decision submitted. Proposal, case and options refreshed.';
     });
+  }
+
+  Future<void> updateCase(Map<String, dynamic> inputs) => _run(() async {
+        selectedCase = await service.updateCase(selectedCase!, inputs);
+        successMessage = 'Case updated.';
+        await _refresh();
+      });
+  Future<void> cancelCase() => _run(() async {
+        await service.cancelCase(selectedCase!);
+        successMessage = 'Case cancelled.';
+        await _refresh();
+      });
+  Future<void> deleteCase() => _run(() async {
+        await service.deleteCase(selectedCase!.id);
+        selectedCase = null;
+        _clearWorkflow();
+        successMessage = 'Case deleted.';
+        cases = await _list();
+      });
+  Future<void> revalidateProposal() => _run(() async {
+        proposal = await service.refreshProposal(proposalId!);
+        successMessage = 'Proposal revalidated.';
+        await _refresh();
+      });
+  void selectProposal(String id) {
+    if (isBusy) return;
+    proposal = proposalHistory.firstWhere((p) => p.id == id);
+    proposalId = id;
+    _notify();
   }
 
   String _message(Object error) {

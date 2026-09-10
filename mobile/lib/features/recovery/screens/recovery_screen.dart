@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/recovery_models.dart';
 import '../providers/recovery_controller.dart';
+import 'recovery_case_form.dart';
+import 'recovery_references_screen.dart';
+import 'recovery_theme.dart';
 
 class RecoveryScreen extends StatefulWidget {
   const RecoveryScreen({super.key});
@@ -29,27 +32,41 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-        animation: controller,
-        builder: (context, child) => Scaffold(
-          backgroundColor: const Color(0xfff7f8f5),
-          appBar: AppBar(
-            title: const Text('Recovery command center'),
-            backgroundColor: const Color(0xfff7f8f5),
-            actions: [
-              IconButton(
-                tooltip: 'Create recovery case',
-                onPressed:
-                    controller.isBusy ? null : () => _showCaseForm(context),
-                icon: const Icon(Icons.add_circle_outline),
-              ),
-            ],
-          ),
-          body: controller.selectedCase == null
-              ? _buildList(context)
-              : _buildDetail(context),
-        ),
-      );
+  Widget build(BuildContext context) => Theme(
+      data: recoveryTheme(context),
+      child: Builder(
+          builder: (context) => AnimatedBuilder(
+                animation: controller,
+                builder: (context, child) => Scaffold(
+                  backgroundColor: const Color(0xfff7f8f5),
+                  appBar: AppBar(
+                    title: const Text('Recovery planning'),
+                    backgroundColor: const Color(0xfff7f8f5),
+                    actions: [
+                      IconButton(
+                          tooltip: 'Value references',
+                          onPressed: controller.isBusy
+                              ? null
+                              : () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute<void>(
+                                      builder: (_) => RecoveryReferencesScreen(
+                                          service: controller.service))),
+                          icon: const Icon(Icons.library_books_outlined)),
+                      IconButton(
+                        tooltip: 'Create recovery case',
+                        onPressed: controller.isBusy
+                            ? null
+                            : () => _showCaseForm(context),
+                        icon: const Icon(Icons.add_circle_outline),
+                      ),
+                    ],
+                  ),
+                  body: controller.selectedCase == null
+                      ? _buildList(context)
+                      : _buildDetail(context),
+                ),
+              )));
 
   Widget _buildList(BuildContext context) => RefreshIndicator(
         onRefresh: controller.loadCases,
@@ -64,6 +81,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
               Expanded(
                   child: TextField(
                       controller: searchController,
+                      enabled: !controller.isBusy,
                       onSubmitted: (_) => controller.loadCases(
                           search: searchController.text, status: status),
                       decoration: const InputDecoration(
@@ -81,11 +99,14 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                           value: item,
                           child: Text(item.isEmpty ? 'All' : item)))
                       .toList(),
-                  onChanged: (value) {
-                    setState(() => status = value ?? '');
-                    controller.loadCases(
-                        search: searchController.text, status: value ?? '');
-                  }),
+                  onChanged: controller.isBusy
+                      ? null
+                      : (value) {
+                          setState(() => status = value ?? '');
+                          controller.loadCases(
+                              search: searchController.text,
+                              status: value ?? '');
+                        }),
             ]),
             const SizedBox(height: 18),
             if (controller.state == RecoveryLoadState.loading)
@@ -118,8 +139,28 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                   icon: Icons.inventory_2_outlined,
                   title: 'No recovery cases',
                   detail: 'Create a recovery request to begin planning.'),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              TextButton(
+                  onPressed: controller.isBusy || controller.cases.page <= 1
+                      ? null
+                      : () =>
+                          controller.loadCases(page: controller.cases.page - 1),
+                  child: const Text('Previous')),
+              Text(
+                  'Page ${controller.cases.page} of ${controller.cases.totalPages < 1 ? 1 : controller.cases.totalPages}'),
+              TextButton(
+                  onPressed: controller.isBusy ||
+                          controller.cases.page >= controller.cases.totalPages
+                      ? null
+                      : () =>
+                          controller.loadCases(page: controller.cases.page + 1),
+                  child: const Text('Next')),
+            ]),
             ...controller.cases.items.map((item) => _CaseTile(
-                item: item, onTap: () => controller.selectCase(item))),
+                item: item,
+                onTap: controller.isBusy
+                    ? null
+                    : () => controller.selectCase(item))),
           ],
         ),
       );
@@ -164,12 +205,48 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                         ]),
                       ]))),
           const SizedBox(height: 14),
+          Wrap(spacing: 8, children: [
+            OutlinedButton(
+                onPressed: !controller.canEdit
+                    ? null
+                    : () => showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        isDismissible: false,
+                        enableDrag: false,
+                        builder: (_) => RecoveryCaseForm(
+                            controller: controller, selected: item)),
+                child: const Text('Edit inputs')),
+            OutlinedButton(
+                onPressed: !controller.canCancel
+                    ? null
+                    : () async {
+                        if (await _confirm(context,
+                            'Cancel this case and invalidate its pending proposal?')) {
+                          await controller.cancelCase();
+                        }
+                      },
+                child: const Text('Cancel case')),
+            TextButton(
+                onPressed: !controller.canDelete
+                    ? null
+                    : () async {
+                        if (await _confirm(context,
+                            'Permanently delete this case without history?')) {
+                          await controller.deleteCase();
+                        }
+                      },
+                child: const Text('Delete case')),
+          ]),
+          const Text(
+              'Editing active inputs creates a new revision and invalidates old options and pending proposals. Cases with history are retained.'),
+          const SizedBox(height: 14),
           Row(children: [
             Expanded(
                 child: Text('Planning progress',
                     style: Theme.of(context).textTheme.titleLarge)),
             FilledButton.icon(
-                onPressed: controller.isBusy || controller.workflowBlocked
+                onPressed: !controller.canPlan
                     ? null
                     : () => controller.plan(
                         replan: item.status != RecoveryCaseStatus.draft),
@@ -213,7 +290,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                   reason: optionUnavailable(option, controller.selectedCase),
                   onSelect: controller.isBusy ||
                           controller.workflowBlocked ||
-                          controller.proposalId != null ||
+                          controller.hasPendingProposal ||
                           optionUnavailable(option, controller.selectedCase) !=
                               null
                       ? null
@@ -233,143 +310,16 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
     await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
-        builder: (_) => _CaseForm(controller: controller));
+        isDismissible: false,
+        enableDrag: false,
+        builder: (_) => RecoveryCaseForm(controller: controller));
   }
 }
-
-class _CaseForm extends StatefulWidget {
-  const _CaseForm({required this.controller});
-  final RecoveryController controller;
-  @override
-  State<_CaseForm> createState() => _CaseFormState();
-}
-
-class _CaseFormState extends State<_CaseForm> {
-  final formKey = GlobalKey<FormState>();
-  final item = TextEditingController();
-  final objective = TextEditingController();
-  final budget = TextEditingController();
-  RecoveryRoute route = RecoveryRoute.reuse;
-  String currency = 'LKR';
-  DateTime? deadline;
-
-  @override
-  void dispose() {
-    item.dispose();
-    objective.dispose();
-    budget.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-      animation: widget.controller,
-      builder: (context, child) => Padding(
-          padding: EdgeInsets.only(
-              left: 18,
-              right: 18,
-              top: 18,
-              bottom: MediaQuery.viewInsetsOf(context).bottom + 18),
-          child: Form(
-              key: formKey,
-              child: SingleChildScrollView(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text('Create recovery request',
-                        style: Theme.of(context).textTheme.headlineSmall),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                        controller: item,
-                        decoration: const InputDecoration(labelText: 'Item ID'),
-                        validator: _required),
-                    TextFormField(
-                        controller: objective,
-                        maxLength: 1000,
-                        decoration:
-                            const InputDecoration(labelText: 'Objective'),
-                        validator: _required),
-                    DropdownButtonFormField<RecoveryRoute>(
-                        value: route,
-                        decoration:
-                            const InputDecoration(labelText: 'Preferred route'),
-                        items: RecoveryRoute.values
-                            .map((value) => DropdownMenuItem(
-                                value: value, child: Text(routeLabel(value))))
-                            .toList(),
-                        onChanged: (value) => setState(
-                            () => route = value ?? RecoveryRoute.reuse)),
-                    Row(children: [
-                      Expanded(
-                          child: TextFormField(
-                              initialValue: currency,
-                              decoration:
-                                  const InputDecoration(labelText: 'Currency'),
-                              onChanged: (value) =>
-                                  currency = value.toUpperCase(),
-                              validator: (value) => value?.length == 3
-                                  ? null
-                                  : 'Use a 3-letter currency')),
-                      const SizedBox(width: 12),
-                      Expanded(
-                          child: TextFormField(
-                              controller: budget,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                      decimal: true),
-                              decoration: const InputDecoration(
-                                  labelText: 'Pickup budget')))
-                    ]),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                        onPressed: () async {
-                          final value = await showDatePicker(
-                              context: context,
-                              firstDate: DateTime.now(),
-                              lastDate:
-                                  DateTime.now().add(const Duration(days: 730)),
-                              initialDate:
-                                  DateTime.now().add(const Duration(days: 7)));
-                          if (value != null) setState(() => deadline = value);
-                        },
-                        icon: const Icon(Icons.event),
-                        label: Text(deadline == null
-                            ? 'Choose deadline'
-                            : _date(deadline!))),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                            onPressed:
-                                widget.controller.isSaving ? null : _submit,
-                            child: Text(widget.controller.isSaving
-                                ? 'Saving…'
-                                : 'Create request'))),
-                    if (widget.controller.errorMessage != null)
-                      _InlineError(message: widget.controller.errorMessage!),
-                  ])))));
-  Future<void> _submit() async {
-    if (!formKey.currentState!.validate()) return;
-    await widget.controller.createCase(
-        itemId: item.text.trim(),
-        objective: objective.text.trim(),
-        route: route,
-        currency: currency,
-        budget: double.tryParse(budget.text),
-        deadline: deadline);
-    if (mounted && widget.controller.errorMessage == null) {
-      Navigator.pop(context);
-    }
-  }
-}
-
-String? _required(String? value) =>
-    value == null || value.trim().isEmpty ? 'Required' : null;
 
 class _CaseTile extends StatelessWidget {
   const _CaseTile({required this.item, required this.onTap});
   final RecoveryCase item;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) => Card(
       child: ListTile(
@@ -420,6 +370,10 @@ class _OptionCard extends StatelessWidget {
               Text(
                   'Net: ${_money(option.estimate?.netValue, option.estimate?.currency)}'),
               Text(
+                  'Total costs: ${_money(option.estimate?.totalCost, option.estimate?.currency)}'),
+              Text(
+                  'Shortfall: ${_money(option.estimate?.shortfall, option.estimate?.currency)}'),
+              Text(
                   'Match: ${option.integration?.match?.response ?? 'Unavailable'}'),
               Text(
                   'Pickup feasibility: ${option.integration?.pickup?.feasibility ?? 'Unavailable'}'),
@@ -452,7 +406,8 @@ class _ProposalCreationCard extends StatefulWidget {
 
 class _ProposalCreationCardState extends State<_ProposalCreationCard> {
   final explanation = TextEditingController();
-  int expiryHours = 24;
+  int expiryMinutes = 60;
+  DateTime? submittedExpiry;
   @override
   void dispose() {
     explanation.dispose();
@@ -470,40 +425,46 @@ class _ProposalCreationCardState extends State<_ProposalCreationCard> {
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Proposal creation',
                   style: Theme.of(context).textTheme.titleLarge),
-              Text(controller.proposalId != null
+              Text(controller.hasPendingProposal
                   ? 'This proposal has been submitted for review.'
                   : controller.selectedOption == null
                       ? 'Select an eligible option above.'
                       : 'Selected route: ${routeLabel(controller.selectedOption!.route)}'),
               DropdownButtonFormField<int>(
-                value: expiryHours,
+                value: expiryMinutes,
                 decoration:
                     const InputDecoration(labelText: 'Proposal expires after'),
-                items: [24, 48, 168]
+                items: [5, 15, 30, 60, 1440, 2880, 10080]
                     .map((hours) => DropdownMenuItem(
-                        value: hours, child: Text('$hours hours')))
+                        value: hours,
+                        child: Text('$hours minutes (capped at deadline)')))
                     .toList(),
-                onChanged: controller.isBusy || controller.proposalId != null
+                onChanged: controller.isBusy || controller.hasPendingProposal
                     ? null
-                    : (value) => setState(() => expiryHours = value ?? 24),
+                    : (value) => setState(() {
+                          expiryMinutes = value ?? 60;
+                          submittedExpiry = null;
+                        }),
               ),
               TextField(
                   controller: explanation,
                   maxLength: 4000,
                   maxLines: 3,
-                  enabled: !controller.isBusy && controller.proposalId == null,
+                  enabled: !controller.isBusy && !controller.hasPendingProposal,
                   decoration: const InputDecoration(
                       labelText: 'Explanation',
                       helperText:
                           'Explain why this option should be approved.'),
-                  onChanged: (_) => setState(() {})),
+                  onChanged: (_) => setState(() {
+                        submittedExpiry = null;
+                      })),
               FilledButton(
                   onPressed: !controller.canCreateProposal ||
                           explanation.text.trim().isEmpty
                       ? null
                       : () => controller.createProposal(
-                          expiresAt:
-                              DateTime.now().add(Duration(hours: expiryHours)),
+                          expiresAt: (submittedExpiry ??=
+                              _expiry(controller.selectedCase, expiryMinutes)),
                           explanation: explanation.text),
                   child: Text(controller.isCreatingProposal
                       ? 'Creating proposal...'
@@ -551,6 +512,26 @@ class _ProposalCardState extends State<_ProposalCard> {
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Proposal review',
                   style: Theme.of(context).textTheme.titleLarge),
+              DropdownButton<String>(
+                  isExpanded: true,
+                  value: controller.proposalId,
+                  items: controller.proposalHistory
+                      .map((p) => DropdownMenuItem(
+                          value: p.id,
+                          child: Text(
+                              'Revision ${p.revision} · ${p.status.name}')))
+                      .toList(),
+                  onChanged: controller.isBusy
+                      ? null
+                      : (id) {
+                          if (id != null) controller.selectProposal(id);
+                        }),
+              if (proposal.status == RecoveryProposalStatus.awaitingApproval)
+                OutlinedButton(
+                    onPressed: controller.isBusy
+                        ? null
+                        : controller.revalidateProposal,
+                    child: const Text('Revalidate proposal')),
               _StatusChip(proposal.status.name),
               Text('Proposal ${proposal.id}'),
               Text('Case ${proposal.caseId}'),
@@ -572,6 +553,10 @@ class _ProposalCardState extends State<_ProposalCard> {
                   'Pickup: ${_money(proposal.estimate?.pickupCost, proposal.estimate?.currency)}'),
               Text(
                   'Net: ${_money(proposal.estimate?.netValue, proposal.estimate?.currency)}'),
+              Text(
+                  'Total costs: ${_money(proposal.estimate?.totalCost, proposal.estimate?.currency)}'),
+              Text(
+                  'Shortfall: ${_money(proposal.estimate?.shortfall, proposal.estimate?.currency)}'),
               if (disabled)
                 const Text(
                     'Decisions require a current proposal awaiting approval with an available future expiry.'),
@@ -651,3 +636,26 @@ String _money(double? value, String? currency) => value == null
     ? 'Pending'
     : '${currency ?? 'LKR'} ${value.toStringAsFixed(2)}';
 String _date(DateTime value) => '${value.day}/${value.month}/${value.year}';
+
+DateTime _expiry(RecoveryCase? item, int minutes) {
+  final value = DateTime.now().add(Duration(minutes: minutes));
+  return item?.deadline != null && item!.deadline!.isBefore(value)
+      ? item.deadline!
+      : value;
+}
+
+Future<bool> _confirm(BuildContext context, String message) async =>
+    await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+                title: const Text('Confirm action'),
+                content: Text(message),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Keep case')),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Confirm'))
+                ])) ??
+    false;

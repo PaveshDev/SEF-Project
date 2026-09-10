@@ -26,16 +26,17 @@ public sealed partial class RecoveryPlannerAgentTests
         Assert.Equal(RecoveryPlannerWorkflowState.AwaitingApproval, result.State);
         Assert.Equal(new[] { RecoveryRoute.Donate, RecoveryRoute.Reuse }, result.Alternatives.Select(x => x.Route));
         Assert.Equal(1, provider.Calls);
-        Assert.Equal(0m, result.Alternatives[0].Valuation.EstimatedNetValue);
+        Assert.Equal(-20m, result.Alternatives[0].Valuation.EstimatedNetValue);
+        Assert.Equal(20m, result.Alternatives[0].Valuation.ToEstimate().Shortfall);
         Assert.Equal(100m, result.Alternatives[1].Valuation.EstimatedNetValue);
         Assert.All(result.Alternatives, alternative =>
         {
             var sent = provider.LastRequest!.EligibleOptions.Single(x => x.Route == alternative.Route).DeterministicValuation;
-            Assert.Equal(alternative.Valuation.Inputs.EstimatedProceedsLow, sent.EstimatedValueLow);
-            Assert.Equal(alternative.Valuation.Inputs.EstimatedProceedsHigh, sent.EstimatedValueHigh);
+            Assert.Equal(alternative.Valuation.ToEstimate().ValueLow, sent.EstimatedValueLow);
+            Assert.Equal(alternative.Valuation.ToEstimate().ValueHigh, sent.EstimatedValueHigh);
             Assert.Equal(alternative.Valuation.EstimatedRepairCost, sent.RepairCost);
             Assert.Equal(alternative.Valuation.EstimatedPickupCost, sent.PickupCost);
-            Assert.Equal(alternative.Valuation.EstimatedNetValue, sent.NetValue);
+            Assert.Equal(alternative.Valuation.ToEstimate().NetValue, sent.NetValue);
             Assert.Equal(alternative.Valuation.Currency, sent.Currency);
         });
         Assert.True(result.Recommendation!.RequiresHumanReview);
@@ -85,20 +86,20 @@ public sealed partial class RecoveryPlannerAgentTests
     }
 
     [Fact]
-    public async Task Missing_valid_fallback_returns_IntegrationUnavailable_and_persists_failed_state()
+    public async Task Stale_reference_prevents_reasoning_and_persists_failed_state()
     {
         var tools = new PlannerTools
         {
             ReferencesResult = PlannerToolResult<IReadOnlyList<RecoveryPlannerValueReference>>.Success(new[]
             {
                 new RecoveryPlannerValueReference(Guid.NewGuid(), 1, 100, 120, "LKR",
-                    "Old reference", DateTimeOffset.UtcNow.AddDays(-60))
+                    "Old reference", DateTimeOffset.UtcNow.AddDays(-60), Input().Assessment.CategoryId, ConditionGrade.Good, RecoveryRoute.Reuse, true)
             })
         };
         var store = new InMemoryRecoveryWorkflowStore();
         var runId = Guid.NewGuid();
         var result = await CreateAgent(tools, workflows: store).RunAsync(Input(), 1, runId, default);
-        Assert.Equal("IntegrationUnavailable", result.Error!.Code);
+        Assert.Equal("no_feasible_alternatives", result.Error!.Code);
         Assert.Equal(RecoveryPlannerWorkflowState.Failed, result.State);
         Assert.Null(tools.ProposalDraft);
         Assert.Equal("Failed", (await store.LoadAsync(runId, default)).Value!.CurrentStep);

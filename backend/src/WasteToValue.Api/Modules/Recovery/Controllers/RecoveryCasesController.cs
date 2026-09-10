@@ -43,9 +43,13 @@ public sealed class RecoveryCasesController(IRecoveryPlanningService planning, I
         [FromHeader(Name = "Idempotency-Key")] string key, CancellationToken ct)
     {
         var result = await proposals.SubmitAsync(caseId, request, key, ct);
-        return Created($"/api/recovery/proposals/{result.Id}", result);
+        return CreatedAtAction(nameof(RecoveryProposalsController.Get), "RecoveryProposals", new { proposalId = result.Id }, result);
     }
     [HttpPost("{caseId:guid}/cancel")]
     public Task<RecoveryCaseResponse> Cancel(Guid caseId, CancelRecoveryCaseRequest request,
         [FromHeader(Name = "Idempotency-Key")] string key, CancellationToken ct) => planning.CancelAsync(caseId, request, key, ct);
+
+    [HttpGet("{caseId:guid}/proposals")]
+    public Task<IReadOnlyList<RecoveryProposalResponse>> Proposals(Guid caseId, CancellationToken ct)
+        => proposals.ListAsync(caseId, ct);
 }

@@ -54,10 +54,12 @@ public sealed class RecoveryCase
     public void UpdateInputs(int expectedVersion, RecoveryInputs inputs, AssessmentSummary assessment, DateTimeOffset now)
     {
         RequireVersion(expectedVersion);
-        RequireState(RecoveryCaseStatus.Draft, RecoveryCaseStatus.RevisionRequested);
+        RequireState(RecoveryCaseStatus.Draft, RecoveryCaseStatus.RevisionRequested,
+            RecoveryCaseStatus.Planning, RecoveryCaseStatus.AwaitingInputs, RecoveryCaseStatus.AwaitingApproval);
         RecoveryRequestValidator.Inputs(inputs, now);
         RecoveryRequestValidator.Assessment(assessment, ItemId, OwnerId);
         SetInputs(inputs, assessment);
+        if (Status != RecoveryCaseStatus.Draft) Status = RecoveryCaseStatus.RevisionRequested;
         Revision = checked(Revision + 1);
         Touch(now);
     }
@@ -75,6 +77,17 @@ public sealed class RecoveryCase
         RequireState(RecoveryCaseStatus.Draft, RecoveryCaseStatus.RevisionRequested, RecoveryCaseStatus.AwaitingInputs, RecoveryCaseStatus.Failed);
         if (Deadline <= now) throw RecoveryException.Conflict("deadline_passed", "The recovery deadline has passed.");
         Status = RecoveryCaseStatus.Planning;
+        Touch(now);
+    }
+
+    public void PrepareReplan(int expectedVersion, DateTimeOffset now)
+    {
+        RequireVersion(expectedVersion);
+        RequireState(RecoveryCaseStatus.Planning, RecoveryCaseStatus.AwaitingApproval,
+            RecoveryCaseStatus.RevisionRequested, RecoveryCaseStatus.AwaitingInputs, RecoveryCaseStatus.Failed);
+        if (Deadline <= now) throw RecoveryException.Conflict("deadline_passed", "The recovery deadline has passed.");
+        Revision = checked(Revision + 1);
+        Status = RecoveryCaseStatus.RevisionRequested;
         Touch(now);
     }
 

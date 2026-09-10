@@ -1,0 +1,31 @@
+--- a/backend/src/WasteToValue.Api/WasteToValue.Api.csproj
++++ b/backend/src/WasteToValue.Api/WasteToValue.Api.csproj
+@@ -15,4 +15,7 @@
+     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
+     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+   </ItemGroup>
++  <ItemGroup>
++    <Compile Include="..\..\..\agents\recovery\**\*.cs" Link="RecoveryAgent\%(RecursiveDir)%(Filename)%(Extension)" />
++  </ItemGroup>
+ </Project>
+--- a/backend/tests/Recovery/WasteToValue.Recovery.Tests/WasteToValue.Recovery.Tests.csproj
++++ b/backend/tests/Recovery/WasteToValue.Recovery.Tests/WasteToValue.Recovery.Tests.csproj
+@@ -23,7 +23,6 @@
+ 
+   <ItemGroup>
+     <Using Include="Xunit" />
+-    <Compile Include="..\..\..\..\agents\recovery\**\*.cs" Link="Agent\%(RecursiveDir)%(Filename)%(Extension)" />
+   </ItemGroup>
+ 
+ </Project>
+--- a/mobile/pubspec.yaml
++++ b/mobile/pubspec.yaml
+@@ -14,6 +14,8 @@
+   go_router: 14.8.1
+ 
+ dev_dependencies:
++  flutter_test:
++    sdk: flutter
+   flutter_lints: 4.0.0
+ 
+ flutter:

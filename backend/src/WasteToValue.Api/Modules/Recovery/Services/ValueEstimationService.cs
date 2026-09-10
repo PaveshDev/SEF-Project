@@ -6,7 +6,8 @@ namespace WasteToValue.Api.Modules.Recovery.Services;
 
 public sealed class ValueEstimationService : IValueEstimationService
 {
-    private static readonly ValueEstimationOptions DefaultOptions = new(TimeSpan.FromDays(30));
+    public static readonly TimeSpan MaximumReferenceAge = TimeSpan.FromDays(30);
+    private static readonly ValueEstimationOptions DefaultOptions = new(MaximumReferenceAge);
     private readonly ValueEstimationOptions options;
     private readonly TimeProvider time;
 
@@ -38,7 +39,11 @@ public sealed class ValueEstimationService : IValueEstimationService
         var proceeds = Round(input.Route == RecoveryRoute.Donate ? 0 : input.EstimatedProceedsLow);
         var repair = Round(input.EstimatedRepairCost);
         var pickup = Round(input.EstimatedPickupCost);
-        var net = Round(proceeds - repair - pickup);
+        RecoveryRequestValidator.Money(proceeds);
+        RecoveryRequestValidator.Money(Round(input.EstimatedProceedsHigh));
+        RecoveryRequestValidator.Money(repair + pickup);
+        var estimate = Calculate(proceeds, input.Route == RecoveryRoute.Donate ? 0 : Round(input.EstimatedProceedsHigh), repair, pickup, input.Currency, costCurrency);
+        var net = estimate.NetValue - estimate.Shortfall;
         var stale = now - input.SourceObservedAt > options.MaximumReferenceAge;
         var warnings = new List<string>();
         if (stale) warnings.Add("The value reference is stale and should be reviewed.");

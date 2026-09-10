@@ -12,6 +12,14 @@ public sealed class ValueReferenceService(RecoveryAccess access, IRecoveryReposi
     {
         var actor = await access.ActorAsync(ct);
         ValidateQuery(query.Page, query.PageSize, query.SortDirection);
+        if (query.SortBy is not null && !new[] { "observedat", "sourcename" }.Contains(query.SortBy.ToLowerInvariant()))
+            throw RecoveryException.Invalid("SortBy must be observedAt or sourceName.");
+        if (query.Search?.Length > 1000) throw RecoveryException.Invalid("Search must not exceed 1000 characters.");
+        if (query.Currency is not null) RecoveryRequestValidator.Currency(query.Currency);
+        if (query.CategoryId is { } category) RecoveryRequestValidator.Id(category, "CategoryId");
+        if (query.Condition is { } condition) RecoveryRequestValidator.Defined(condition);
+        if (query.Route is { } route) RecoveryRequestValidator.Defined(route);
+        if (query.ObservedAfter > query.ObservedBefore) throw RecoveryException.Invalid("Observation date range is reversed.");
         var result = await repository.ListReferencesAsync(query, actor.CanManageValueReferences, ct);
         var items = result.Items.Select(ValueReferenceResponse.From).ToArray();
         return new(items, result.Page, result.PageSize, result.TotalCount);
@@ -57,7 +65,7 @@ public sealed class ValueReferenceService(RecoveryAccess access, IRecoveryReposi
 
     private static void ValidateQuery(int page, int pageSize, string? direction)
     {
-        if (page < 1 || pageSize is < 1 or > 100) throw RecoveryException.Invalid("Page must be positive and page size must be between 1 and 100.");
+        if (page < 1 || pageSize is < 1 or > 100 || (long)(page - 1) * pageSize > int.MaxValue) throw RecoveryException.Invalid("Page must be positive and page size must be between 1 and 100.");
         if (direction is not null && direction is not ("asc" or "desc")) throw RecoveryException.Invalid("Sort direction must be asc or desc.");
     }
 

@@ -22,6 +22,8 @@ public sealed class ProposalDecision
         if (!actor.IsHuman || actor.UserId != ownerId)
             throw new RecoveryException(403, "human_owner_required", "Only the human item owner may decide a proposal.");
         RecoveryRequestValidator.Defined(decision);
+        if (decision == ProposalDecisionKind.RevisionRequested)
+            RecoveryRequestValidator.Text(comment, "Comment", 2000);
         RecoveryRequestValidator.Text(idempotencyKey, "Idempotency-Key", 100);
         if (comment?.Length > 2000) throw RecoveryException.Invalid("Comment must not exceed 2000 characters.");
         return new ProposalDecision { RecoveryProposalId = proposal.Id, ProposalRevision = proposal.Revision,

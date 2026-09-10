@@ -11,6 +11,8 @@ export function optionUnavailable(option, item) {
   if (!item?.id || !Number.isInteger(item.version) || item.version < 1) return 'Reload the case before selecting an option.'
   if (!option?.id || !Number.isInteger(option.version) || option.version < 1 || option.caseRevision !== item.revision) return 'This option is stale or incomplete. Replan the case.'
   if (!['Validated', 'Selected'].includes(option.status) || !option.estimate) return 'This option has not been validated.'
+  const estimate = option.estimate
+  if (['valueLow', 'valueHigh', 'repairCost', 'pickupCost', 'netValue', 'shortfall'].some(key => !Number.isFinite(estimate[key]) || estimate[key] < 0 || estimate[key] > 9999999999.99) || estimate.valueLow > estimate.valueHigh || estimate.currency !== item.currency || (estimate.netValue > 0 && estimate.shortfall > 0)) return 'The estimate is incomplete or invalid.'
   if (typeof option.requiresPartner !== 'boolean' || typeof option.requiresPickup !== 'boolean') return 'Integration requirements are unavailable.'
   const match = option.integration?.match
   const pickup = option.integration?.pickup

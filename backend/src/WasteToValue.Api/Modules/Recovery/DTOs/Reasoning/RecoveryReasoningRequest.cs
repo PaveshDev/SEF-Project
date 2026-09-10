@@ -13,7 +13,7 @@ public sealed record RecoveryReasoningOption(Guid OptionId, RecoveryRoute Route,
     RecoveryReasoningMatch? Match, RecoveryReasoningPickup? Pickup);
 
 public sealed record RecoveryReasoningValuation(decimal EstimatedValueLow, decimal EstimatedValueHigh,
-    decimal RepairCost, decimal PickupCost, decimal NetValue, string Currency);
+    decimal RepairCost, decimal PickupCost, decimal NetValue, string Currency, decimal Shortfall = 0);
 
 public sealed record RecoveryReasoningMatch(string Eligibility, string Response);
 public sealed record RecoveryReasoningPickup(string Feasibility, decimal EstimatedCost, string Currency);

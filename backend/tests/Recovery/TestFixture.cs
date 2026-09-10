@@ -28,8 +28,11 @@ internal sealed class TestRepository : IRecoveryRepository
     public Task<PagedResult<ValueReference>> ListReferencesAsync(ValueReferenceQuery query, bool includeUnverified, CancellationToken ct)
     {
         var items = References.Where(x => (includeUnverified || x.IsVerified) && (query.Condition is null || x.Condition == query.Condition) &&
+            (query.CategoryId is null || x.CategoryId == query.CategoryId) &&
+            (query.ObservedAfter is null || x.ObservedAt >= query.ObservedAfter) &&
+            (query.ObservedBefore is null || x.ObservedAt <= query.ObservedBefore) &&
             (query.Route is null || x.Route == query.Route) && (query.Currency is null || x.Currency == query.Currency) &&
-            (string.IsNullOrWhiteSpace(query.Search) || x.SourceName.Contains(query.Search))).ToArray();
+            (string.IsNullOrWhiteSpace(query.Search) || x.SourceName.Contains(query.Search))).OrderByDescending(x => x.ObservedAt).ThenBy(x => x.Id).ToArray();
         return Task.FromResult(new PagedResult<ValueReference>(items.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToArray(), query.Page, query.PageSize, items.Length));
     }
     public Task<ValueReference?> FindReferenceAsync(Guid id, CancellationToken ct) => Task.FromResult(References.SingleOrDefault(x => x.Id == id));
