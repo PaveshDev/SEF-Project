@@ -6,9 +6,14 @@ import { partnersRoutes } from '../modules/partners/routes.jsx'
 import { collectionsRoutes } from '../modules/collections/routes.jsx'
 
 export const router = createBrowserRouter([
-  { path: '/', element: <App /> },
-  ...itemsRoutes,
-  ...recoveryRoutes,
-  ...partnersRoutes,
-  ...collectionsRoutes,
+  { 
+    path: '/', 
+    element: <App />,
+    children: [
+      ...itemsRoutes,
+      ...recoveryRoutes,
+      ...partnersRoutes,
+      ...collectionsRoutes,
+    ]
+  }
 ])
