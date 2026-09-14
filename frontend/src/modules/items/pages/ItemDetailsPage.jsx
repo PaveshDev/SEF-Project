@@ -20,12 +20,18 @@ export function ItemDetailsPage() {
   const [submitError, setSubmitError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (isLoading) return <div className="items-module-container">Loading item details...</div>;
+  if (isLoading) return (
+    <div className="items-module-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+      <div style={{ fontSize: '1.2rem', color: '#6b7280' }}>Loading item details...</div>
+    </div>
+  );
+  
   if (error) {
-    if (error.status === 404) return <div className="items-module-container">Item not found.</div>;
-    if (error.status === 403) return <div className="items-module-container">You do not have permission to view this item.</div>;
-    return <div className="items-module-container"><div className="error-alert">Error: {error.message}</div></div>;
+    if (error.status === 404) return <div className="items-module-container" style={{ textAlign: 'center', padding: '4rem 2rem' }}><h3>Item not found.</h3></div>;
+    if (error.status === 403) return <div className="items-module-container" style={{ textAlign: 'center', padding: '4rem 2rem' }}><h3>You do not have permission to view this item.</h3></div>;
+    return <div className="items-module-container"><div className="error-alert" style={{ backgroundColor: '#fee2e2', color: '#b91c1c', padding: '1rem', borderRadius: '0.375rem' }}>Error: {error.message}</div></div>;
   }
+  
   if (!item) return <div className="items-module-container">Item not found.</div>;
 
   const handleAssessmentSubmit = async () => {
@@ -52,21 +58,27 @@ export function ItemDetailsPage() {
     await requestReassessment(assessmentId, reason, fetchItem);
   };
 
-  // Only allow editing if in Draft state (per backend rules)
   const canEdit = item.status === 'Draft';
-  // Only allow submit if in Draft and has condition answers
   const canSubmit = item.status === 'Draft' && item.conditionAnswers && item.conditionAnswers.length > 0;
 
   return (
-    <div className="items-module-container">
-      <div className="items-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="items-module-container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
+      
+      {/* Action Bar & Header */}
+      <div className="items-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem', backgroundColor: '#f9fafb', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}>
         <div>
-          <h2>{item.title}</h2>
-          <p>Detailed view of this item and its assessment progress.</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+            <h2 style={{ fontSize: '2rem', fontWeight: '800', margin: 0, color: '#111827' }}>{item.title}</h2>
+            <span className={`status-badge status-${item.status.toLowerCase()}`} style={{ padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: '600' }}>
+              {item.status.replace(/([A-Z])/g, ' $1').trim()}
+            </span>
+          </div>
+          <p style={{ margin: 0, color: '#4b5563' }}>Created on {new Date(item.createdAt).toLocaleDateString()} {item.updatedAt ? ` • Last updated ${new Date(item.updatedAt).toLocaleDateString()}` : ''}</p>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           {canEdit && (
-            <Link to={`/items/${item.id}/edit`} className="btn-warning">
+            <Link to={`/items/${item.id}/edit`} className="btn-warning" style={{ textDecoration: 'none', padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: '600', backgroundColor: '#f59e0b', color: 'white', display: 'flex', alignItems: 'center' }}>
               Edit Item
             </Link>
           )}
@@ -75,6 +87,7 @@ export function ItemDetailsPage() {
               onClick={handleAssessmentSubmit} 
               disabled={isSubmitting}
               className="btn-primary"
+              style={{ padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: '600', backgroundColor: '#10b981', color: 'white', border: 'none', cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
             >
               {isSubmitting ? 'Submitting...' : 'Submit for Assessment'}
             </button>
@@ -82,84 +95,92 @@ export function ItemDetailsPage() {
         </div>
       </div>
       
-      {submitError && <div className="error-alert" role="alert">{submitError}</div>}
+      {submitError && <div className="error-alert" role="alert" style={{ backgroundColor: '#fee2e2', color: '#b91c1c', padding: '1rem', borderRadius: '0.375rem', marginBottom: '2rem' }}>{submitError}</div>}
 
-      <div className="item-details-card">
-        <div className="item-details-grid">
-          <div>
-            <h3 style={{ marginTop: 0, marginBottom: '20px' }}>Item Details</h3>
-            
-            <div className="detail-row">
-              <div className="detail-label">Description</div>
-              <div className="detail-value">{item.description}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', marginBottom: '2rem' }}>
+        
+        {/* Details Card */}
+        <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)' }}>
+          <h3 style={{ marginTop: 0, marginBottom: '1.5rem', fontSize: '1.25rem', color: '#111827', borderBottom: '1px solid #e5e7eb', paddingBottom: '0.5rem' }}>Item Information</h3>
+          
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            <div>
+              <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Description</div>
+              <div style={{ color: '#111827', marginTop: '0.25rem', whiteSpace: 'pre-wrap' }}>{item.description || 'No description provided.'}</div>
             </div>
-            
-            <div className="detail-row">
-              <div className="detail-label">Category</div>
-              <div className="detail-value">{item.category}</div>
-            </div>
-            
-            <div className="detail-row">
-              <div className="detail-label">Location Area</div>
-              <div className="detail-value">{item.locationArea}</div>
-            </div>
-            
-            <div className="detail-row">
-              <div className="detail-label">Status</div>
-              <div className="detail-value">
-                <span className={`status-badge status-${item.status.toLowerCase()}`}>{item.status}</span>
+            <div style={{ display: 'flex', gap: '2rem' }}>
+              <div>
+                <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Category</div>
+                <div style={{ color: '#111827', marginTop: '0.25rem', fontWeight: '500' }}>{item.category}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Location</div>
+                <div style={{ color: '#111827', marginTop: '0.25rem', fontWeight: '500' }}>{item.locationArea}</div>
               </div>
             </div>
-            
-            <div className="detail-row">
-              <div className="detail-label">Version</div>
-              <div className="detail-value">{item.version}</div>
-            </div>
           </div>
+        </div>
+
+        {/* Condition Answers */}
+        <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)' }}>
+          <h3 style={{ marginTop: 0, marginBottom: '1.5rem', fontSize: '1.25rem', color: '#111827', borderBottom: '1px solid #e5e7eb', paddingBottom: '0.5rem' }}>Condition Assessment</h3>
           
-          <div>
-            <h3 style={{ marginTop: 0, marginBottom: '20px' }}>Photos</h3>
-            <PhotoManager 
-              photos={item.photos} 
-              onAddPhoto={addPhoto} 
+          {item.status === 'Draft' ? (
+            <ConditionAnswersForm 
+              existingAnswers={item.conditionAnswers} 
+              onSubmit={submitConditionAnswers} 
             />
-          </div>
+          ) : (
+            <div>
+              {item.conditionAnswers && item.conditionAnswers.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {item.conditionAnswers.map(ans => (
+                    <div key={ans.id} style={{ backgroundColor: '#f9fafb', padding: '1rem', borderRadius: '0.375rem', border: '1px solid #e5e7eb' }}>
+                      <p style={{ margin: '0 0 0.5rem 0', fontWeight: '600', color: '#374151', fontSize: '0.95rem' }}>{ans.questionText}</p>
+                      <p style={{ margin: '0', color: '#111827' }}>{ans.answer}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ color: '#6b7280', fontStyle: 'italic' }}>No condition information provided.</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      <hr style={{ margin: '30px 0' }} />
-
-      {item.status === 'Draft' ? (
-        <ConditionAnswersForm 
-          existingAnswers={item.conditionAnswers} 
-          onSubmit={submitConditionAnswers} 
+      {/* Photos Section */}
+      <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)', marginBottom: '2rem' }}>
+        <h3 style={{ marginTop: 0, marginBottom: '1.5rem', fontSize: '1.25rem', color: '#111827', borderBottom: '1px solid #e5e7eb', paddingBottom: '0.5rem' }}>Photographs</h3>
+        <PhotoManager 
+          photos={item.photos} 
+          onAddPhoto={addPhoto} 
         />
-      ) : (
-        <div>
-          <h3>Condition Answers</h3>
-          {item.conditionAnswers?.map(ans => (
-            <div key={ans.id} style={{ marginBottom: '10px' }}>
-              <p style={{ margin: '0', fontWeight: 'bold' }}>{ans.questionText}</p>
-              <p style={{ margin: '0' }}>{ans.answer}</p>
-            </div>
-          ))}
+      </div>
+
+      {/* Assessment History & Clarifications */}
+      {((item.assessments && item.assessments.length > 0) || (item.assessments?.[0]?.clarifications?.length > 0)) && (
+        <div style={{ marginTop: '3rem' }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#111827', marginBottom: '1.5rem', borderBottom: '2px solid #e5e7eb', paddingBottom: '0.5rem' }}>Assessment Review & Clarifications</h2>
+          
+          <div style={{ display: 'grid', gap: '2rem' }}>
+            {item.assessments && item.assessments.length > 0 && (
+              <AssessmentView 
+                assessment={item.assessments[0]} 
+                onConfirm={handleConfirmAssessment}
+                onRequestReassessment={handleRequestReassessment}
+              />
+            )}
+
+            {item.assessments?.[0]?.clarifications && item.assessments[0].clarifications.length > 0 && (
+              <ClarificationList 
+                clarifications={item.assessments[0].clarifications}
+                onAnswerClarification={handleAnswerClarification}
+              />
+            )}
+          </div>
         </div>
       )}
-
-      {/* Render the latest assessment if available */}
-      {item.assessments && item.assessments.length > 0 && (
-        <AssessmentView 
-          assessment={item.assessments[0]} // Assessments are ordered by version desc in backend
-          onConfirm={handleConfirmAssessment}
-          onRequestReassessment={handleRequestReassessment}
-        />
-      )}
-
-      {/* Clarifications typically come with an assessment, maybe pending */}
-      <ClarificationList 
-        clarifications={item.assessments?.[0]?.clarifications?.filter(c => !c.answer)}
-        onAnswerClarification={handleAnswerClarification}
-      />
     </div>
   );
 }

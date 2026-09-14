@@ -57,6 +57,123 @@ describe('Member 1 Items React Frontend', () => {
     await screen.findByText('Item Details Page');
   });
 
+  describe('Title Validation', () => {
+    it('rejects empty title', async () => {
+      render(
+        <MemoryRouter initialEntries={['/items/new']}>
+          <Routes>
+            <Route path="/items/new" element={<CreateItemPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+      
+      fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: '' } });
+      fireEvent.change(screen.getByLabelText(/Category \*/), { target: { value: 'Electronics' } });
+      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Room A' } });
+      const form = screen.getByLabelText(/Title \*/).closest('form');
+      fireEvent.submit(form);
+      
+      expect(await screen.findByText('Title is required')).toBeInTheDocument();
+      expect(itemsApi.createItem).not.toHaveBeenCalled();
+    });
+
+    it('rejects whitespace-only title', async () => {
+      render(
+        <MemoryRouter initialEntries={['/items/new']}>
+          <Routes>
+            <Route path="/items/new" element={<CreateItemPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+      
+      fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: '   ' } });
+      fireEvent.change(screen.getByLabelText(/Category \*/), { target: { value: 'Electronics' } });
+      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Room A' } });
+      fireEvent.click(screen.getByRole('button', { name: /Save Item/i }));
+      
+      expect(await screen.findByText('Title is required')).toBeInTheDocument();
+      expect(itemsApi.createItem).not.toHaveBeenCalled();
+    });
+
+    it('rejects "12345" title', async () => {
+      render(
+        <MemoryRouter initialEntries={['/items/new']}>
+          <Routes>
+            <Route path="/items/new" element={<CreateItemPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+      
+      fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: '12345' } });
+      fireEvent.change(screen.getByLabelText(/Category \*/), { target: { value: 'Electronics' } });
+      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Room A' } });
+      fireEvent.click(screen.getByRole('button', { name: /Save Item/i }));
+      
+      expect(await screen.findByText('Title must contain at least one letter.')).toBeInTheDocument();
+      expect(itemsApi.createItem).not.toHaveBeenCalled();
+    });
+
+    it('accepts "Laptop" title', async () => {
+      itemsApi.createItem.mockResolvedValue({ id: '1' });
+      render(
+        <MemoryRouter initialEntries={['/items/new']}>
+          <Routes>
+            <Route path="/items/new" element={<CreateItemPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+      
+      fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: 'Laptop' } });
+      fireEvent.change(screen.getByLabelText(/Category \*/), { target: { value: 'Electronics' } });
+      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Room A' } });
+      fireEvent.click(screen.getByRole('button', { name: /Save Item/i }));
+      
+      await waitFor(() => {
+        expect(itemsApi.createItem).toHaveBeenCalledWith(expect.objectContaining({ title: 'Laptop' }));
+      });
+    });
+
+    it('accepts "Laptop 15" title', async () => {
+      itemsApi.createItem.mockResolvedValue({ id: '1' });
+      render(
+        <MemoryRouter initialEntries={['/items/new']}>
+          <Routes>
+            <Route path="/items/new" element={<CreateItemPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+      
+      fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: 'Laptop 15' } });
+      fireEvent.change(screen.getByLabelText(/Category \*/), { target: { value: 'Electronics' } });
+      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Room A' } });
+      fireEvent.click(screen.getByRole('button', { name: /Save Item/i }));
+      
+      await waitFor(() => {
+        expect(itemsApi.createItem).toHaveBeenCalledWith(expect.objectContaining({ title: 'Laptop 15' }));
+      });
+    });
+
+    it('accepts "Office Chair 2" title', async () => {
+      itemsApi.createItem.mockResolvedValue({ id: '1' });
+      render(
+        <MemoryRouter initialEntries={['/items/new']}>
+          <Routes>
+            <Route path="/items/new" element={<CreateItemPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+      
+      fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: 'Office Chair 2' } });
+      fireEvent.change(screen.getByLabelText(/Category \*/), { target: { value: 'Electronics' } });
+      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Room A' } });
+      fireEvent.click(screen.getByRole('button', { name: /Save Item/i }));
+      
+      await waitFor(() => {
+        expect(itemsApi.createItem).toHaveBeenCalledWith(expect.objectContaining({ title: 'Office Chair 2' }));
+      });
+    });
+  });
+
   // 2. Item rendering & Conditional UI (Submit button disabled/hidden if not draft)
   it('hides Submit button if item status is not Draft', async () => {
     itemsApi.getItem.mockResolvedValue({
@@ -117,7 +234,7 @@ describe('Member 1 Items React Frontend', () => {
 
     // Fill required fields to pass HTML5 validation
     fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: 'Test' } });
-    fireEvent.change(screen.getByLabelText(/Category \*/), { target: { value: 'Cat' } });
+    fireEvent.change(screen.getByLabelText(/Category \*/), { target: { value: 'Electronics' } });
     fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Loc' } });
 
     fireEvent.click(screen.getByRole('button', { name: /Save Item/i }));
@@ -162,7 +279,7 @@ describe('Member 1 Items React Frontend', () => {
     itemsApi.getItem.mockResolvedValue({
       id: '123',
       title: 'Draft Item',
-      category: 'Cat',
+      category: 'Electronics',
       locationArea: 'Loc',
       status: 'Draft',
       version: 1
@@ -213,8 +330,9 @@ describe('Member 1 Items React Frontend', () => {
 
     // Fill in the static questions
     const textareas = screen.getAllByRole('textbox');
-    fireEvent.change(textareas[textareas.length - 2], { target: { value: 'Yes, powers on' } });
-    fireEvent.change(textareas[textareas.length - 1], { target: { value: 'No damage' } });
+    // We assume the first two textboxes are the condition answers
+    fireEvent.change(textareas[0], { target: { value: 'Yes, powers on' } });
+    fireEvent.change(textareas[1], { target: { value: 'No damage' } });
 
     fireEvent.click(screen.getByRole('button', { name: /Save Answers/i }));
 
@@ -265,7 +383,7 @@ describe('Member 1 Items React Frontend', () => {
           status: 'AwaitingInformation', 
           version: 1,
           clarifications: [
-            { id: 'c1', questionText: 'Is the power cable included?' }
+            { id: 'c1', question: 'Is the power cable included?', status: 'Pending', reason: 'Need to know to assess value.' }
           ]
         }
       ]
@@ -282,7 +400,7 @@ describe('Member 1 Items React Frontend', () => {
     await screen.findByText('Assessed Item');
     
     // Find the clarification input
-    const input = screen.getByPlaceholderText('Type your answer here...');
+    const input = screen.getByPlaceholderText('Type your detailed answer here...');
     fireEvent.change(input, { target: { value: 'Yes, included.' } });
 
     fireEvent.click(screen.getByRole('button', { name: /Submit Answer/i }));
