@@ -1,2 +1,3 @@
 | Date | Task | Tool / model | Assistance used | Human review and changes | Validation | Related commit / PR |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-09-08 | Member 4 UI preview and integration notes | Codex / GPT-6 | Created module-scoped React and Flutter screens with fictional session data from the supplied pickup/handover specification; documented deferred backend/agent work | Pending user review; implementation restricted to UI under AGENTS.md | Source and whitespace checks passed; frontend install/build/lint blocked by registry HTTP 403; Flutter/Dart unavailable on PATH; no runtime tests claimed | Uncommitted working-tree changes on feature/member-4-collections |
