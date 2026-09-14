@@ -36,14 +36,14 @@ class CollectionSlot {
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-    'id': id,
-    'collectorId': collectorId,
-    'startsAt': startsAt.toIso8601String(),
-    'endsAt': endsAt.toIso8601String(),
-    'serviceArea': serviceArea,
-    'capacity': capacity,
-    'reservedCount': reservedCount,
-    'vehicleClass': vehicleClass,
-    'status': status,
-  };
+        'id': id,
+        'collectorId': collectorId,
+        'startsAt': startsAt.toIso8601String(),
+        'endsAt': endsAt.toIso8601String(),
+        'serviceArea': serviceArea,
+        'capacity': capacity,
+        'reservedCount': reservedCount,
+        'vehicleClass': vehicleClass,
+        'status': status,
+      };
 }

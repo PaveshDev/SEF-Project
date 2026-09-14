@@ -24,7 +24,9 @@ class HandoverProof {
       pickupEventId: json['pickupEventId'] as String,
       proofType: json['proofType'] as String,
       verifiedBy: json['verifiedBy'] as String?,
-      verifiedAt: json['verifiedAt'] != null ? DateTime.parse(json['verifiedAt'] as String) : null,
+      verifiedAt: json['verifiedAt'] != null
+          ? DateTime.parse(json['verifiedAt'] as String)
+          : null,
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
   }

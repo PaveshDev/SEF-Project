@@ -39,15 +39,15 @@ class PickupRequest {
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-    'id': id,
-    'recoveryProposalId': recoveryProposalId,
-    'collectionSlotId': collectionSlotId,
-    'collectorId': collectorId,
-    'ownerId': ownerId,
-    'scheduledStart': scheduledStart.toIso8601String(),
-    'scheduledEnd': scheduledEnd.toIso8601String(),
-    'status': status,
-    'createdAt': createdAt.toIso8601String(),
-    'updatedAt': updatedAt.toIso8601String(),
-  };
+        'id': id,
+        'recoveryProposalId': recoveryProposalId,
+        'collectionSlotId': collectionSlotId,
+        'collectorId': collectorId,
+        'ownerId': ownerId,
+        'scheduledStart': scheduledStart.toIso8601String(),
+        'scheduledEnd': scheduledEnd.toIso8601String(),
+        'status': status,
+        'createdAt': createdAt.toIso8601String(),
+        'updatedAt': updatedAt.toIso8601String(),
+      };
 }

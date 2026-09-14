@@ -23,7 +23,8 @@ class CollectionProposal {
     return CollectionProposal(
       proposalId: json['proposalId'] as String,
       pickupRequestId: json['pickupRequestId'] as String,
-      recommended: ProposalOption.fromJson(json['recommended'] as Map<String, dynamic>),
+      recommended:
+          ProposalOption.fromJson(json['recommended'] as Map<String, dynamic>),
       fallback: json['fallback'] != null
           ? ProposalOption.fromJson(json['fallback'] as Map<String, dynamic>)
           : null,

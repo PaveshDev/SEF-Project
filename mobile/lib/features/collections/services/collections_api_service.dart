@@ -33,7 +33,8 @@ class CollectionsApiService {
     try {
       final response = await _dio.get<List<dynamic>>(
         '/pickups',
-        queryParameters: status != null ? <String, String>{'status': status} : null,
+        queryParameters:
+            status != null ? <String, String>{'status': status} : null,
       );
       return (response.data ?? <dynamic>[]).cast<Map<String, dynamic>>();
     } catch (_) {
@@ -52,14 +53,16 @@ class CollectionsApiService {
 
   Future<List<Map<String, dynamic>>> fetchPickupEvents(String pickupId) async {
     try {
-      final response = await _dio.get<List<dynamic>>('/pickups/$pickupId/events');
+      final response =
+          await _dio.get<List<dynamic>>('/pickups/$pickupId/events');
       return (response.data ?? <dynamic>[]).cast<Map<String, dynamic>>();
     } catch (_) {
       return <Map<String, dynamic>>[];
     }
   }
 
-  Future<Map<String, dynamic>?> reschedulePickup(String id, String reason, String requestedBy) async {
+  Future<Map<String, dynamic>?> reschedulePickup(
+      String id, String reason, String requestedBy) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/pickups/$id/reschedule',
@@ -106,9 +109,11 @@ class CollectionsApiService {
     return response.data;
   }
 
-  Future<List<Map<String, dynamic>>> fetchHandoverProofs(String pickupId) async {
+  Future<List<Map<String, dynamic>>> fetchHandoverProofs(
+      String pickupId) async {
     try {
-      final response = await _dio.get<List<dynamic>>('/pickups/$pickupId/handover');
+      final response =
+          await _dio.get<List<dynamic>>('/pickups/$pickupId/handover');
       return (response.data ?? <dynamic>[]).cast<Map<String, dynamic>>();
     } catch (_) {
       return <Map<String, dynamic>>[];
@@ -117,7 +122,8 @@ class CollectionsApiService {
 
   // ── Agent ──────────────────────────────────────────────
 
-  Future<Map<String, dynamic>?> prepareCollectionPlan(String pickupRequestId) async {
+  Future<Map<String, dynamic>?> prepareCollectionPlan(
+      String pickupRequestId) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/agent/plan',
