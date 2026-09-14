@@ -80,7 +80,8 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
       appBar: AppBar(
         title: const Text('Item Details'),
         actions: [
-          if (_item != null && (_item!.status == 'Draft' || _item!.status == 'Pending'))
+          if (_item != null &&
+              (_item!.status == 'Draft' || _item!.status == 'Pending'))
             IconButton(
               icon: const Icon(Icons.edit),
               onPressed: () async {
@@ -150,7 +151,8 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
       children: [
         Text(_item!.title, style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
-        Text('Status: ${_item!.status}', style: const TextStyle(fontWeight: FontWeight.bold)),
+        Text('Status: ${_item!.status}',
+            style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         Text('Category: ${_item!.category}'),
         Text('Location: ${_item!.locationArea}'),
@@ -174,7 +176,8 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                 icon: const Icon(Icons.add_a_photo),
                 label: const Text('Add'),
                 onPressed: () async {
-                  final result = await context.push('/items/${_item!.id}/photos/add');
+                  final result =
+                      await context.push('/items/${_item!.id}/photos/add');
                   if (result == true) {
                     _loadItem();
                   }
@@ -222,13 +225,15 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Condition Answers', style: Theme.of(context).textTheme.titleLarge),
+            Text('Condition Answers',
+                style: Theme.of(context).textTheme.titleLarge),
             if (_item!.status == 'Draft')
               TextButton.icon(
                 icon: const Icon(Icons.edit_note),
                 label: const Text('Edit'),
                 onPressed: () async {
-                  final result = await context.push('/items/${_item!.id}/condition-answers');
+                  final result = await context
+                      .push('/items/${_item!.id}/condition-answers');
                   if (result == true) {
                     _loadItem();
                   }
@@ -267,7 +272,8 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                 subtitle: Text('Grade: ${a.conditionGrade ?? 'N/A'}'),
                 trailing: isLatest ? const Chip(label: Text('Latest')) : null,
                 onTap: () async {
-                  final result = await context.push('/items/${_item!.id}/assessments/${a.id}');
+                  final result = await context
+                      .push('/items/${_item!.id}/assessments/${a.id}');
                   if (result == true) {
                     _loadItem();
                   }

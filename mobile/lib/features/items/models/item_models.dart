@@ -68,14 +68,17 @@ class Item {
       locationArea: json['locationArea'] as String,
       status: json['status'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt'] as String) : null,
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'] as String)
+          : null,
       version: json['version'] as int,
       photos: (json['photos'] as List<dynamic>?)
               ?.map((e) => ItemPhoto.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
       conditionAnswers: (json['conditionAnswers'] as List<dynamic>?)
-              ?.map((e) => ItemConditionAnswer.fromJson(e as Map<String, dynamic>))
+              ?.map((e) =>
+                  ItemConditionAnswer.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
       assessments: (json['assessments'] as List<dynamic>?)
@@ -184,13 +187,17 @@ class ItemAssessment {
       confidence: (json['confidence'] as num).toDouble(),
       status: json['status'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt'] as String) : null,
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'] as String)
+          : null,
       evidences: (json['evidences'] as List<dynamic>?)
-              ?.map((e) => AssessmentEvidence.fromJson(e as Map<String, dynamic>))
+              ?.map(
+                  (e) => AssessmentEvidence.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
       clarifications: (json['clarifications'] as List<dynamic>?)
-              ?.map((e) => AssessmentClarification.fromJson(e as Map<String, dynamic>))
+              ?.map((e) =>
+                  AssessmentClarification.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
     );
@@ -256,7 +263,9 @@ class AssessmentClarification {
       status: json['status'] as String,
       answer: json['answer'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
-      answeredAt: json['answeredAt'] != null ? DateTime.parse(json['answeredAt'] as String) : null,
+      answeredAt: json['answeredAt'] != null
+          ? DateTime.parse(json['answeredAt'] as String)
+          : null,
     );
   }
 }

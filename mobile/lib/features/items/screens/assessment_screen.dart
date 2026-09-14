@@ -38,7 +38,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     });
 
     try {
-      final assessment = await _itemsService.getAssessment(widget.itemId, widget.assessmentId);
+      final assessment =
+          await _itemsService.getAssessment(widget.itemId, widget.assessmentId);
       setState(() {
         _assessment = assessment;
         _isLoading = false;
@@ -46,7 +47,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     } on DioException catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Failed to load assessment. ${e.response?.statusCode ?? ''}';
+        _errorMessage =
+            'Failed to load assessment. ${e.response?.statusCode ?? ''}';
       });
     } catch (e) {
       setState(() {
@@ -78,7 +80,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           children: [
             Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: _loadAssessment, child: const Text('Retry')),
+            ElevatedButton(
+                onPressed: _loadAssessment, child: const Text('Retry')),
           ],
         ),
       );
@@ -115,12 +118,16 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Version: ${_assessment!.version}', style: Theme.of(context).textTheme.titleMedium),
+        Text('Version: ${_assessment!.version}',
+            style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 4),
-        Text('Status: ${_assessment!.status}', style: const TextStyle(fontWeight: FontWeight.bold)),
+        Text('Status: ${_assessment!.status}',
+            style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Text('Confidence: ${(_assessment!.confidence * 100).toStringAsFixed(1)}%'),
-        Text('Date: ${_assessment!.createdAt.toLocal().toString().split('.')[0]}'),
+        Text(
+            'Confidence: ${(_assessment!.confidence * 100).toStringAsFixed(1)}%'),
+        Text(
+            'Date: ${_assessment!.createdAt.toLocal().toString().split('.')[0]}'),
       ],
     );
   }
@@ -129,7 +136,11 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('AI ASSESSMENT', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.blue)),
+        Text('AI ASSESSMENT',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(color: Colors.blue)),
         const SizedBox(height: 8),
         _buildInfoRow('Suggested Category', _assessment!.suggestedCategory),
         _buildInfoRow('Condition Grade', _assessment!.conditionGrade),
@@ -144,7 +155,11 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('OWNER REPORTED', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.green)),
+        Text('OWNER REPORTED',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(color: Colors.green)),
         const SizedBox(height: 8),
         _buildInfoRow('Functionality', _assessment!.ownerReportedFunctionality),
       ],
@@ -158,7 +173,11 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
+          Text(label,
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  color: Colors.grey)),
           Text(value),
         ],
       ),

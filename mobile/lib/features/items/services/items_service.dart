@@ -5,7 +5,9 @@ class ItemsService {
   Future<List<ItemSummary>> getItems() async {
     final response = await apiClient.get('/api/items');
     final data = response.data as List<dynamic>;
-    return data.map((e) => ItemSummary.fromJson(e as Map<String, dynamic>)).toList();
+    return data
+        .map((e) => ItemSummary.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<Item> getItem(String id) async {
@@ -62,7 +64,8 @@ class ItemsService {
   }
 
   Future<ItemAssessment> getAssessment(String id, String assessmentId) async {
-    final response = await apiClient.get('/api/items/$id/assessments/$assessmentId');
+    final response =
+        await apiClient.get('/api/items/$id/assessments/$assessmentId');
     return ItemAssessment.fromJson(response.data as Map<String, dynamic>);
   }
 
@@ -74,15 +77,16 @@ class ItemsService {
     );
   }
 
-  Future<void> createClarification(String id, Map<String, dynamic> request) async {
+  Future<void> createClarification(
+      String id, Map<String, dynamic> request) async {
     await apiClient.post(
       '/api/items/$id/clarifications',
       data: request,
     );
   }
 
-  Future<void> answerClarification(
-      String id, String clarificationId, AnswerClarificationRequest request) async {
+  Future<void> answerClarification(String id, String clarificationId,
+      AnswerClarificationRequest request) async {
     await apiClient.post(
       '/api/items/$id/clarifications/$clarificationId/answer',
       data: request.toJson(),
@@ -97,8 +101,8 @@ class ItemsService {
     );
   }
 
-  Future<void> requestReassessment(
-      String id, String assessmentId, RequestReassessmentRequest request) async {
+  Future<void> requestReassessment(String id, String assessmentId,
+      RequestReassessmentRequest request) async {
     await apiClient.post(
       '/api/items/$id/assessments/$assessmentId/reassessment',
       data: request.toJson(),

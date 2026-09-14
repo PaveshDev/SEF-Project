@@ -32,7 +32,7 @@ class _ConditionAnswersScreenState extends State<ConditionAnswersScreen> {
     for (var q in _staticQuestions) {
       _controllers[q['code']!] = TextEditingController();
     }
-    // Ideally we would load existing answers here and pre-fill, 
+    // Ideally we would load existing answers here and pre-fill,
     // but the prompt focuses on standard functionality.
   }
 
@@ -52,11 +52,13 @@ class _ConditionAnswersScreenState extends State<ConditionAnswersScreen> {
     });
 
     try {
-      final answers = _staticQuestions.map((q) => ConditionAnswerDto(
-        questionCode: q['code']!,
-        questionText: q['text']!,
-        answer: _controllers[q['code']]!.text.trim(),
-      )).toList();
+      final answers = _staticQuestions
+          .map((q) => ConditionAnswerDto(
+                questionCode: q['code']!,
+                questionText: q['text']!,
+                answer: _controllers[q['code']]!.text.trim(),
+              ))
+          .toList();
 
       final request = SubmitConditionAnswersRequest(answers: answers);
 
@@ -65,7 +67,8 @@ class _ConditionAnswersScreenState extends State<ConditionAnswersScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Condition answers submitted successfully')),
+          const SnackBar(
+              content: Text('Condition answers submitted successfully')),
         );
         context.pop(true);
       }

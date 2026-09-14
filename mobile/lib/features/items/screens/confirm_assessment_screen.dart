@@ -16,7 +16,8 @@ class ConfirmAssessmentScreen extends StatefulWidget {
   });
 
   @override
-  State<ConfirmAssessmentScreen> createState() => _ConfirmAssessmentScreenState();
+  State<ConfirmAssessmentScreen> createState() =>
+      _ConfirmAssessmentScreenState();
 }
 
 class _ConfirmAssessmentScreenState extends State<ConfirmAssessmentScreen> {
@@ -30,11 +31,14 @@ class _ConfirmAssessmentScreenState extends State<ConfirmAssessmentScreen> {
 
     try {
       final request = ConfirmAssessmentRequest(accepted: accepted);
-      await _itemsService.confirmAssessment(widget.itemId, widget.assessmentId, request);
+      await _itemsService.confirmAssessment(
+          widget.itemId, widget.assessmentId, request);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(accepted ? 'Assessment confirmed' : 'Assessment rejected')),
+          SnackBar(
+              content: Text(
+                  accepted ? 'Assessment confirmed' : 'Assessment rejected')),
         );
         context.pop(true);
       }
@@ -86,7 +90,8 @@ class _ConfirmAssessmentScreenState extends State<ConfirmAssessmentScreen> {
               const SizedBox(height: 16),
               OutlinedButton(
                 onPressed: () => _submit(false),
-                child: const Text('Reject Assessment', style: TextStyle(color: Colors.red)),
+                child: const Text('Reject Assessment',
+                    style: TextStyle(color: Colors.red)),
               ),
             ],
           ],

@@ -18,7 +18,7 @@ class _CreateItemScreenState extends State<CreateItemScreen> {
   final _descriptionController = TextEditingController();
   final _categoryController = TextEditingController();
   final _locationController = TextEditingController();
-  
+
   final ItemsService _itemsService = ItemsService();
   bool _isSubmitting = false;
 
@@ -47,7 +47,7 @@ class _CreateItemScreenState extends State<CreateItemScreen> {
       );
 
       final createdItem = await _itemsService.createItem(request);
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Item created successfully')),

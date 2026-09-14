@@ -61,7 +61,8 @@ final List<RouteBase> itemsRoutes = <RouteBase>[
                 builder: (context, state) {
                   final id = state.pathParameters['id']!;
                   final assessmentId = state.pathParameters['assessmentId']!;
-                  return ConfirmAssessmentScreen(itemId: id, assessmentId: assessmentId);
+                  return ConfirmAssessmentScreen(
+                      itemId: id, assessmentId: assessmentId);
                 },
               ),
               GoRoute(
@@ -69,7 +70,8 @@ final List<RouteBase> itemsRoutes = <RouteBase>[
                 builder: (context, state) {
                   final id = state.pathParameters['id']!;
                   final assessmentId = state.pathParameters['assessmentId']!;
-                  return ReassessmentScreen(itemId: id, assessmentId: assessmentId);
+                  return ReassessmentScreen(
+                      itemId: id, assessmentId: assessmentId);
                 },
               ),
             ],
@@ -79,7 +81,8 @@ final List<RouteBase> itemsRoutes = <RouteBase>[
             builder: (context, state) {
               final id = state.pathParameters['id']!;
               final clarificationId = state.pathParameters['clarificationId']!;
-              return ClarificationScreen(itemId: id, clarificationId: clarificationId);
+              return ClarificationScreen(
+                  itemId: id, clarificationId: clarificationId);
             },
           ),
         ],

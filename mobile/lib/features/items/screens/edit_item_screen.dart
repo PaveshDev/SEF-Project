@@ -20,7 +20,7 @@ class _EditItemScreenState extends State<EditItemScreen> {
   final _descriptionController = TextEditingController();
   final _categoryController = TextEditingController();
   final _locationController = TextEditingController();
-  
+
   final ItemsService _itemsService = ItemsService();
   Item? _item;
   bool _isLoading = true;
@@ -55,7 +55,7 @@ class _EditItemScreenState extends State<EditItemScreen> {
       _descriptionController.text = item.description;
       _categoryController.text = item.category;
       _locationController.text = item.locationArea;
-      
+
       setState(() {
         _isLoading = false;
       });
@@ -90,7 +90,7 @@ class _EditItemScreenState extends State<EditItemScreen> {
       );
 
       await _itemsService.updateItem(widget.itemId, request);
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Item updated successfully')),
@@ -102,7 +102,8 @@ class _EditItemScreenState extends State<EditItemScreen> {
         if (e.response?.statusCode == 409) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Conflict detected: This item was modified by another process. Reloading latest data...'),
+              content: Text(
+                  'Conflict detected: This item was modified by another process. Reloading latest data...'),
               backgroundColor: Colors.orange,
               duration: Duration(seconds: 4),
             ),
@@ -140,9 +141,11 @@ class _EditItemScreenState extends State<EditItemScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                      Text(_errorMessage!,
+                          style: const TextStyle(color: Colors.red)),
                       const SizedBox(height: 16),
-                      ElevatedButton(onPressed: _loadItem, child: const Text('Retry'))
+                      ElevatedButton(
+                          onPressed: _loadItem, child: const Text('Retry'))
                     ],
                   ),
                 )
@@ -159,8 +162,9 @@ class _EditItemScreenState extends State<EditItemScreen> {
                             labelText: 'Title',
                             border: OutlineInputBorder(),
                           ),
-                          validator: (value) =>
-                              value == null || value.isEmpty ? 'Title is required' : null,
+                          validator: (value) => value == null || value.isEmpty
+                              ? 'Title is required'
+                              : null,
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
@@ -203,7 +207,8 @@ class _EditItemScreenState extends State<EditItemScreen> {
                               ? const SizedBox(
                                   height: 20,
                                   width: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Text('Save Changes'),
                         ),
