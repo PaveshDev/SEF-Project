@@ -15,12 +15,14 @@ public class ItemsController(IItemService itemService) : ControllerBase
 {
     private Guid GetOwnerId()
     {
-        var claimId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (Guid.TryParse(claimId, out var id))
+        var identity = User?.Identity as ClaimsIdentity;
+        if (identity?.IsAuthenticated == true &&
+            Guid.TryParse(identity.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) &&
+            id != Guid.Empty)
             return id;
 
-        // Mock owner for development purposes
-        return Guid.Parse("00000000-0000-0000-0000-000000000001");
+        throw new System.Security.Authentication.AuthenticationException(
+            "An authenticated user with a valid user identifier is required.");
     }
 
     private ObjectResult HandleException(Exception ex)

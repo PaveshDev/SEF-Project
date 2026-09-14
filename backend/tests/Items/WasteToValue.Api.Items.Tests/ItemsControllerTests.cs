@@ -71,6 +71,8 @@ public class ItemsControllerTests
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(200, okResult.StatusCode);
         Assert.Equal(response, okResult.Value);
+        _itemServiceMock.Verify(s => s.GetUserItemsAsync(_ownerId, CancellationToken.None), Times.Once);
+        _itemServiceMock.VerifyNoOtherCalls();
     }
 
     [Fact]
@@ -108,6 +110,68 @@ public class ItemsControllerTests
         // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(401, objectResult.StatusCode);
+        var problem = Assert.IsType<ProblemDetails>(objectResult.Value);
+        Assert.Equal(401, problem.Status);
+        Assert.Equal("Unauthorized", problem.Title);
+        Assert.Equal("An authenticated user with a valid user identifier is required.", problem.Detail);
+        _itemServiceMock.VerifyNoOtherCalls();
+    }
+
+    [Theory]
+    [InlineData("mock", null)]
+    [InlineData("mock", "")]
+    [InlineData("mock", "not-a-guid")]
+    [InlineData("mock", "00000000-0000-0000-0000-000000000000")]
+    [InlineData(null, "11111111-1111-4111-8111-111111111111")]
+    public async Task GetUserItems_WithoutValidAuthenticatedIdentifier_Returns401(string? authenticationType, string? identifier)
+    {
+        var claims = identifier is null
+            ? Array.Empty<Claim>()
+            : new[] { new Claim(ClaimTypes.NameIdentifier, identifier) };
+        _controller.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType));
+
+        var result = await _controller.GetUserItems(CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(401, objectResult.StatusCode);
+        var problem = Assert.IsType<ProblemDetails>(objectResult.Value);
+        Assert.Equal(401, problem.Status);
+        Assert.Equal("Unauthorized", problem.Title);
+        _itemServiceMock.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task GetUserItems_IdentifierOnlyOnUnauthenticatedSecondaryIdentity_Returns401()
+    {
+        _controller.HttpContext.User = new ClaimsPrincipal(new[]
+        {
+            new ClaimsIdentity(Array.Empty<Claim>(), "mock"),
+            new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, _ownerId.ToString()) })
+        });
+
+        var result = await _controller.GetUserItems(CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(401, objectResult.StatusCode);
+        var problem = Assert.IsType<ProblemDetails>(objectResult.Value);
+        Assert.Equal(401, problem.Status);
+        Assert.Equal("Unauthorized", problem.Title);
+        _itemServiceMock.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task GetUserItems_WithoutHttpContext_Returns401()
+    {
+        var controller = new ItemsController(_itemServiceMock.Object);
+
+        var result = await controller.GetUserItems(CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(401, objectResult.StatusCode);
+        var problem = Assert.IsType<ProblemDetails>(objectResult.Value);
+        Assert.Equal(401, problem.Status);
+        Assert.Equal("Unauthorized", problem.Title);
+        _itemServiceMock.VerifyNoOtherCalls();
     }
     [Fact]
     public async Task GetItem_Returns200OK()

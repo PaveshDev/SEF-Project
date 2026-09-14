@@ -15,6 +15,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{8070AF45
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WasteToValue.Tests.Collections", "tests\Collections\WasteToValue.Tests.Collections.csproj", "{627671E2-D361-4107-96A3-9111A3CCE6C1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WasteToValue.Api.Items.Tests", "tests\Items\WasteToValue.Api.Items.Tests\WasteToValue.Api.Items.Tests.csproj", "{389B3A45-83C9-4FFB-AE6E-ABC1BEDD0337}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WasteToValue.Recovery.Tests", "tests\Recovery\WasteToValue.Recovery.Tests\WasteToValue.Recovery.Tests.csproj", "{B07D8CB2-1351-4FE5-85B6-3CDBC9D399E1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -40,9 +44,19 @@ Global
 		{627671E2-D361-4107-96A3-9111A3CCE6C1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{627671E2-D361-4107-96A3-9111A3CCE6C1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{627671E2-D361-4107-96A3-9111A3CCE6C1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{389B3A45-83C9-4FFB-AE6E-ABC1BEDD0337}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{389B3A45-83C9-4FFB-AE6E-ABC1BEDD0337}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{389B3A45-83C9-4FFB-AE6E-ABC1BEDD0337}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{389B3A45-83C9-4FFB-AE6E-ABC1BEDD0337}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B07D8CB2-1351-4FE5-85B6-3CDBC9D399E1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B07D8CB2-1351-4FE5-85B6-3CDBC9D399E1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B07D8CB2-1351-4FE5-85B6-3CDBC9D399E1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B07D8CB2-1351-4FE5-85B6-3CDBC9D399E1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{1B269829-7F8A-4C6E-8350-2002C6EB34BA} = {12344378-7DFC-4B6D-A864-503DFB805BFA}
 		{627671E2-D361-4107-96A3-9111A3CCE6C1} = {8070AF45-9107-4B0A-97B7-D24450ED423C}
+		{389B3A45-83C9-4FFB-AE6E-ABC1BEDD0337} = {8070AF45-9107-4B0A-97B7-D24450ED423C}
+		{B07D8CB2-1351-4FE5-85B6-3CDBC9D399E1} = {8070AF45-9107-4B0A-97B7-D24450ED423C}
 	EndGlobalSection
 EndGlobal
