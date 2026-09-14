@@ -138,7 +138,7 @@ export function ItemDetailsPage() {
         <div>
           <h3>Condition Answers</h3>
           {item.conditionAnswers?.map(ans => (
-            <div key={ans.id} style={{ marginBottom: '10px' }}>
+            <div key={ans.id ?? ans.questionCode ?? ans.questionText} style={{ marginBottom: '10px' }}>
               <p style={{ margin: '0', fontWeight: 'bold' }}>{ans.questionText}</p>
               <p style={{ margin: '0' }}>{ans.answer}</p>
             </div>

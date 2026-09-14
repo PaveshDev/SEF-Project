@@ -85,8 +85,8 @@ export function mapStatusFromApi(apiStatus) {
 
 // ── Collection Slots ───────────────────────────────────────
 
-export async function fetchSlots() {
-  const { data } = await api.get('/slots')
+export async function fetchSlots(signal) {
+  const { data } = await api.get('/slots', { signal })
   return (data || []).map(mapSlotFromApi)
 }
 
@@ -132,9 +132,9 @@ export async function deleteSlot(id) {
 
 // ── Pickup Requests ────────────────────────────────────────
 
-export async function fetchPickups(status) {
+export async function fetchPickups(status, signal) {
   const params = status ? { status: mapStatusToApi(status) } : {}
-  const { data } = await api.get('/pickups', { params })
+  const { data } = await api.get('/pickups', { params, signal })
   return (data || []).map(mapPickupFromApi)
 }
 
@@ -176,8 +176,8 @@ export async function deletePickup(id) {
   return true
 }
 
-export async function fetchPickupEvents(pickupId) {
-  const { data } = await api.get(`/pickups/${pickupId}/events`)
+export async function fetchPickupEvents(pickupId, signal) {
+  const { data } = await api.get(`/pickups/${pickupId}/events`, { signal })
   return data
 }
 
@@ -208,8 +208,8 @@ export async function fetchHandoverProofs(pickupId) {
 
 // ── Collection Agent ───────────────────────────────────────
 
-export async function prepareCollectionPlan(pickupRequestId) {
-  const { data } = await api.post('/agent/plan', { pickupRequestId })
+export async function prepareCollectionPlan(pickupRequestId, signal) {
+  const { data } = await api.post('/agent/plan', { pickupRequestId }, { signal })
   return data
 }
 

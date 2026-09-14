@@ -1,6 +1,6 @@
 import { formatDate } from '../demoData.js'
 
-export default function CollectionSlotsSection({ slots, setModal, Icon }) {
+export default function CollectionSlotsSection({ slots, setModal }) {
   return <section className="cl-panel">
     <div className="cl-panel-heading">
       <div><h2>Available collection slots</h2><p className="cl-muted">Preview availability, vehicle capacity, and staff assignments.</p></div>

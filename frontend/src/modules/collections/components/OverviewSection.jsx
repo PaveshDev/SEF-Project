@@ -1,6 +1,6 @@
 import { formatDate, milestones } from '../demoData.js'
 
-export default function OverviewSection({ jobs, slots, calendarDate, setCalendarDate, setSection, setModal, Icon, Badge }) {
+export default function OverviewSection({ jobs, calendarDate, setCalendarDate, setSection, setModal, Icon, Badge }) {
   const pending = jobs.filter(job => job.status === 'Awaiting review').length
   const failed = jobs.filter(job => job.status === 'Failed')
   const completed = jobs.filter(job => job.status === 'Handover Verified')

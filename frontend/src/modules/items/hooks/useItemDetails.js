@@ -1,80 +1,74 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { itemsApi } from '../services/itemsApi';
 
 export function useItemDetails(id) {
-  const [item, setItem] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [concurrencyError, setConcurrencyError] = useState(null);
+  const [state, setState] = useState({ id, item: null, isLoading: Boolean(id), error: null, concurrencyError: null });
+  const activeRequest = useRef(null);
 
-  const fetchItem = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    setConcurrencyError(null);
-    try {
-      const data = await itemsApi.getItem(id);
-      setItem(data);
-    } catch (err) {
-      setError({
-        message: err.response?.data?.detail || err.message || 'Failed to fetch item details',
-        status: err.response?.status
+  const loadItem = useCallback((signal) => itemsApi.getItem(id, signal)
+    .then(item => {
+      if (!signal.aborted) setState({ id, item, isLoading: false, error: null, concurrencyError: null });
+    }).catch(err => {
+      if (!signal.aborted) setState({
+        id, item: null, isLoading: false, concurrencyError: null,
+        error: {
+          message: err.response?.data?.detail || err.message || 'Failed to fetch item details',
+          status: err.response?.status
+        }
       });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [id]);
+    }), [id]);
 
   useEffect(() => {
-    if (id) {
-      fetchItem();
-    }
-  }, [id, fetchItem]);
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    if (id) loadItem(controller.signal);
+    return () => activeRequest.current?.abort();
+  }, [id, loadItem]);
+
+  const fetchItem = useCallback(() => {
+    if (!id || activeRequest.current?.signal.aborted) return;
+    activeRequest.current?.abort();
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    setState(prev => ({ id, item: prev.id === id ? prev.item : null, isLoading: true, error: null, concurrencyError: null }));
+    return loadItem(controller.signal);
+  }, [id, loadItem]);
 
   const updateItem = async (request) => {
+    const signal = activeRequest.current?.signal;
     try {
       const updatedItem = await itemsApi.updateItem(id, request);
-      setItem(updatedItem);
-      setConcurrencyError(null);
+      if (signal && !signal.aborted) setState(prev => ({ ...prev, item: updatedItem, concurrencyError: null }));
       return updatedItem;
     } catch (err) {
-      if (err.response && err.response.status === 409) {
-        setConcurrencyError(err.response.data?.detail || 'The item was modified by another user.');
+      if (signal && !signal.aborted && err.response?.status === 409) {
+        setState(prev => ({ ...prev, concurrencyError: err.response.data?.detail || 'The item was modified by another user.' }));
       }
       throw err;
     }
   };
 
   const submitItem = async () => {
-    try {
-      const updatedItem = await itemsApi.submitItemForAssessment(id);
-      setItem(updatedItem);
-      return updatedItem;
-    } catch (err) {
-      throw err;
-    }
+    const signal = activeRequest.current?.signal;
+    const updatedItem = await itemsApi.submitItemForAssessment(id);
+    if (signal && !signal.aborted) setState(prev => ({ ...prev, item: updatedItem }));
+    return updatedItem;
   };
 
   const addPhoto = async (request) => {
+    const signal = activeRequest.current?.signal;
     const newPhoto = await itemsApi.addPhoto(id, request);
-    // Refresh item to get updated photos list
-    await fetchItem();
+    if (signal && !signal.aborted) await fetchItem();
     return newPhoto;
   };
 
   const submitConditionAnswers = async (request) => {
+    const signal = activeRequest.current?.signal;
     await itemsApi.submitConditionAnswers(id, request);
-    await fetchItem();
+    if (signal && !signal.aborted) await fetchItem();
   };
 
-  return { 
-    item, 
-    isLoading, 
-    error, 
-    concurrencyError, 
-    fetchItem, 
-    updateItem, 
-    submitItem, 
-    addPhoto, 
-    submitConditionAnswers 
-  };
+  // A new route must never display the previous item's data or errors while loading.
+  const current = state.id === id ? state : { item: null, isLoading: Boolean(id), error: null, concurrencyError: null };
+  return { ...current, fetchItem, updateItem, submitItem, addPhoto, submitConditionAnswers };
 }

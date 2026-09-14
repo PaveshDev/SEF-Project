@@ -1,39 +1,56 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { prepareCollectionPlan, approveProposal, fetchPickupEvents } from '../services/collectionsApi.js'
 
-export default function ProposalReviewSection({ review, setReview, tell, Icon, Badge }) {
+export default function ProposalReviewSection({ review, setReview, tell, Badge }) {
   const [proposal, setProposal] = useState(null)
   const [events, setEvents] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [reviewNotes, setReviewNotes] = useState('')
   const [reviewError, setReviewError] = useState('')
   const [serverError, setServerError] = useState('')
+  const activeRequest = useRef(null)
+  const mounted = useRef(false)
 
   // Default demo pickup ID for Member 4 review workflow
   const demoPickupId = 'c1000000-0000-0000-0000-000000001042'
   const staffMemberId = 'b1000000-0000-0000-0000-000000000001'
 
-  const loadProposalAndEvents = async () => {
-    setLoading(true)
-    setServerError('')
-    try {
-      const plan = await prepareCollectionPlan(demoPickupId)
+  const loadProposalAndEvents = useCallback((signal) =>
+    prepareCollectionPlan(demoPickupId, signal).then(plan => {
+      if (signal.aborted) return
       if (plan) {
         setProposal(plan)
       }
-      const eventList = await fetchPickupEvents(demoPickupId)
+      return fetchPickupEvents(demoPickupId, signal)
+    }).then(eventList => {
+      if (signal.aborted) return
       setEvents(eventList || [])
-    } catch (err) {
-      setServerError('Failed to load proposal from backend API.')
-    } finally {
-      setLoading(false)
-    }
-  }
+    }).catch(() => {
+      if (!signal.aborted) setServerError('Failed to load proposal from backend API.')
+    }).finally(() => {
+      if (!signal.aborted) setLoading(false)
+    }), [])
 
   useEffect(() => {
-    loadProposalAndEvents()
-  }, [])
+    mounted.current = true
+    const controller = new AbortController()
+    activeRequest.current = controller
+    loadProposalAndEvents(controller.signal)
+    return () => {
+      mounted.current = false
+      activeRequest.current?.abort()
+    }
+  }, [loadProposalAndEvents])
+
+  const refreshProposal = useCallback(() => {
+    activeRequest.current?.abort()
+    const controller = new AbortController()
+    activeRequest.current = controller
+    setLoading(true)
+    setServerError('')
+    return loadProposalAndEvents(controller.signal)
+  }, [loadProposalAndEvents])
 
   const handleDecision = async (actionType) => {
     const apiDecision = actionType === 'Approve' ? 'APPROVED' : actionType === 'Reject' ? 'REJECTED' : 'REVISION_REQUESTED'
@@ -55,11 +72,12 @@ export default function ProposalReviewSection({ review, setReview, tell, Icon, B
           notes: reviewNotes.trim() || `${actionType} by staff.`
         })
 
+        if (!mounted.current) return
         if (updated) {
           setProposal(updated)
           setReview({ action: actionType, notes: reviewNotes.trim() })
           tell(`${actionType} submitted successfully. Pickup status updated in backend.`)
-          await loadProposalAndEvents()
+          await refreshProposal()
         } else {
           setServerError('Decision failed. Slot may no longer be available.')
         }
@@ -68,9 +86,9 @@ export default function ProposalReviewSection({ review, setReview, tell, Icon, B
         tell(`${actionType} preference saved locally.`)
       }
     } catch (err) {
-      setServerError(err.response?.data?.error || err.message || 'Error submitting staff decision.')
+      if (mounted.current) setServerError(err.response?.data?.error || err.message || 'Error submitting staff decision.')
     } finally {
-      setSubmitting(false)
+      if (mounted.current) setSubmitting(false)
     }
   }
 

@@ -11,6 +11,7 @@ import { itemsApi } from '../services/itemsApi';
 vi.mock('../services/itemsApi', () => ({
   itemsApi: {
     createItem: vi.fn(),
+    getUserItems: vi.fn().mockResolvedValue([]),
     getItem: vi.fn(),
     updateItem: vi.fn(),
     submitItemForAssessment: vi.fn(),

@@ -1,6 +1,6 @@
 import { formatDate } from '../demoData.js'
 
-export default function FailedPickupsSection({ jobs, setSection, setModal, Icon, Badge }) {
+export default function FailedPickupsSection({ jobs, setSection, setModal, Badge }) {
   const failed = jobs.filter(job => job.status === 'Failed')
 
   return <div className="cl-failure-list">{failed.map(job => <section className="cl-panel" key={job.id}>

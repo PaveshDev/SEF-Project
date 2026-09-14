@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useCollections } from './hooks/useCollections.js'
-import { formatDate, milestones } from './demoData.js'
+import { formatDate } from './demoData.js'
 import OverviewSection from './components/OverviewSection.jsx'
 import PickupJobsSection from './components/PickupJobsSection.jsx'
 import CollectionSlotsSection from './components/CollectionSlotsSection.jsx'
@@ -137,11 +137,11 @@ export default function CollectionsDashboard() {
         <div className="cl-page-heading"><div><p className="cl-eyebrow">PICKUP &amp; HANDOVER MANAGEMENT</p><h1>{section === 'Overview' ? 'Every pickup, a new possibility.' : section}</h1><p className="cl-muted">{section === 'Overview' ? 'Plan collections, keep things moving, and close the loop.' : 'Manage the next step in an item\u2019s journey.'}</p></div><button className="cl-button cl-primary" onClick={() => setModal({ type: 'draft' })}><span aria-hidden="true">+</span> New pickup</button></div>
         {notice && <div className="cl-notice" role="status"><span>{notice}</span><button className="cl-icon-button" aria-label="Dismiss notice" onClick={() => setNotice('')}>×</button></div>}
 
-        {section === 'Overview' && <OverviewSection jobs={jobs} slots={slots} calendarDate={calendarDate} setCalendarDate={setCalendarDate} setSection={setSection} setModal={setModal} Icon={Icon} Badge={Badge} />}
+        {section === 'Overview' && <OverviewSection jobs={jobs} calendarDate={calendarDate} setCalendarDate={setCalendarDate} setSection={setSection} setModal={setModal} Icon={Icon} Badge={Badge} />}
         {section === 'Pickup jobs' && <PickupJobsSection jobs={jobs} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} setModal={setModal} Icon={Icon} Badge={Badge} />}
-        {section === 'Collection slots' && <CollectionSlotsSection slots={slots} setModal={setModal} Icon={Icon} />}
-        {section === 'Proposal review' && <ProposalReviewSection review={review} setReview={setReview} tell={tell} Icon={Icon} Badge={Badge} />}
-        {section === 'Failed pickups' && <FailedPickupsSection jobs={jobs} setSection={setSection} setModal={setModal} Icon={Icon} Badge={Badge} />}
+        {section === 'Collection slots' && <CollectionSlotsSection slots={slots} setModal={setModal} />}
+        {section === 'Proposal review' && <ProposalReviewSection review={review} setReview={setReview} tell={tell} Badge={Badge} />}
+        {section === 'Failed pickups' && <FailedPickupsSection jobs={jobs} setSection={setSection} setModal={setModal} Badge={Badge} />}
         {section === 'Handover' && <HandoverSection jobs={jobs} tell={tell} verifyCode={verifyCode} Icon={Icon} />}
         {section === 'Reports' && <><ReportsSection jobs={jobs} tell={tell} Icon={Icon} Badge={Badge} /><CollectionAnalytics jobs={jobs} Icon={Icon} /></>}
 

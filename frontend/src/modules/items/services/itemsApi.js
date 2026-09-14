@@ -6,13 +6,13 @@ export const itemsApi = {
     return data;
   },
   
-  getItem: async (id) => {
-    const { data } = await apiClient.get(`/api/items/${id}`);
+  getItem: async (id, signal) => {
+    const { data } = await apiClient.get(`/api/items/${id}`, { signal });
     return data;
   },
 
-  getUserItems: async () => {
-    const { data } = await apiClient.get('/api/items');
+  getUserItems: async (signal) => {
+    const { data } = await apiClient.get('/api/items', { signal });
     return data;
   },
   

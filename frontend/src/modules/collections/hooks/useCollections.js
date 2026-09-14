@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   fetchPickups, fetchSlots, fetchPickupEvents,
   createPickup, updatePickup, deletePickup, reschedulePickup,
@@ -17,33 +17,47 @@ export function useCollections() {
   const [jobs, setJobs] = useState([])
   const [slots, setSlots] = useState([])
   const [proposal, setProposal] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [apiConnected, setApiConnected] = useState(false)
+  const activeRequest = useRef(null)
 
   // ── Initial load ─────────────────────────────────────────
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [pickupData, slotData] = await Promise.all([fetchPickups(), fetchSlots()])
+  const loadInitialData = useCallback((signal) =>
+    Promise.all([fetchPickups(undefined, signal), fetchSlots(signal)]).then(([pickupData, slotData]) => {
+      if (signal.aborted) return
       // HTTP 200 from backend: API is connected even if arrays are empty []
       setApiConnected(true)
       setJobs(pickupData || [])
       setSlots(slotData || [])
-    } catch (err) {
+    }).catch(err => {
+      if (signal.aborted) return
       setApiConnected(false)
       const msg = err.response?.data?.error || err.response?.data?.title || err.message || 'Failed to connect to backend API'
       setError(msg)
       setJobs([])
       setSlots([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+    }).finally(() => {
+      if (!signal.aborted) setLoading(false)
+    }), [])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    const controller = new AbortController()
+    activeRequest.current = controller
+    loadInitialData(controller.signal)
+    return () => activeRequest.current?.abort()
+  }, [loadInitialData])
+
+  const loadData = useCallback(() => {
+    if (activeRequest.current?.signal.aborted) return
+    activeRequest.current?.abort()
+    const controller = new AbortController()
+    activeRequest.current = controller
+    setLoading(true)
+    setError(null)
+    return loadInitialData(controller.signal)
+  }, [loadInitialData])
 
   // ── Pickup CRUD ──────────────────────────────────────────
 
@@ -184,7 +198,7 @@ export function useCollections() {
     jobs, slots, proposal, loading, error, apiConnected,
 
     // Data loading
-    loadData, loadEvents, loadProofs, loadProposal,
+    loadData, loadEvents, loadProposal,
 
     // Pickup CRUD
     addJob, updateJob, removeJob, rescheduleJob,
