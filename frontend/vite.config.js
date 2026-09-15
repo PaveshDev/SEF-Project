@@ -4,4 +4,10 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   server: { host: 'localhost', port: 5173, strictPort: true },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/setupTests.js',
+    pool: 'threads',
+  },
 })
