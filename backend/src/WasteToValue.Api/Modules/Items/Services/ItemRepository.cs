@@ -25,6 +25,7 @@ public class ItemRepository(AppDbContext context) : IItemRepository
             .Include(x => x.ConditionAnswers)
             .Include(x => x.Assessments)
             .Include(x => x.Clarifications)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 

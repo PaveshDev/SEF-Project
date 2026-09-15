@@ -7,7 +7,23 @@ using WasteToValue.Api.Modules.Items.DTOs;
 using WasteToValue.Api.Modules.Items.Interfaces;
 using WasteToValue.Api.Modules.Items.Services;
 
+using Microsoft.AspNetCore.Mvc.Filters;
+
 namespace WasteToValue.Api.Modules.Items.Controllers;
+
+public class MockAuthFilter : IAsyncActionFilter
+{
+    public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
+    {
+        // Inject a mock user for UI development since authentication is strictly kept absent
+        var identity = new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, "00000000-0000-0000-0000-000000000001")
+        }, "Mock");
+        context.HttpContext.User = new ClaimsPrincipal(identity);
+        await next();
+    }
+}
 
 [ApiController]
 [Route("api/items")]
@@ -19,12 +35,17 @@ public class ItemsController(IItemService itemService) : ControllerBase
         if (Guid.TryParse(claimId, out var id))
             return id;
 
+#if DEBUG
         // Mock owner for development purposes
         return Guid.Parse("00000000-0000-0000-0000-000000000001");
+#else
+        throw new System.Security.Authentication.AuthenticationException("User identifier claim is missing or invalid.");
+#endif
     }
 
     private ObjectResult HandleException(Exception ex)
     {
+        Console.WriteLine(ex.ToString());
         return ex switch
         {
             ItemConcurrencyException => Conflict(new ProblemDetails { Status = 409, Title = "Concurrency conflict", Detail = ex.Message }),

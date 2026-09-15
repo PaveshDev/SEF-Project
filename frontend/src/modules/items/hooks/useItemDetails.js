@@ -66,6 +66,10 @@ export function useItemDetails(id) {
     await fetchItem();
   };
 
+  const deleteItem = async () => {
+    await itemsApi.deleteItem(id);
+  };
+
   return { 
     item, 
     isLoading, 
@@ -75,6 +79,7 @@ export function useItemDetails(id) {
     updateItem, 
     submitItem, 
     addPhoto, 
-    submitConditionAnswers 
+    submitConditionAnswers,
+    deleteItem
   };
 }

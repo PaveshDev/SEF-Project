@@ -106,94 +106,99 @@ export function ItemForm({ initialData, onSubmit, isSubmitting, fieldErrors = {}
   };
 
   return (
-    <form onSubmit={handleSubmit} className="item-form" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
-        <label htmlFor="title" style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Title *</label>
-        <input 
-          type="text" 
-          id="title" 
-          name="title" 
-          value={formData.title} 
-          onChange={handleChange} 
-          required 
-          maxLength={200}
-          aria-invalid={!!(validationErrors.title || fieldErrors.title)}
-          style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #d1d5db', width: '100%' }}
-        />
-        {getError('title')}
-      </div>
-      
-      <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
-        <label htmlFor="description" style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Description</label>
-        <textarea 
-          id="description" 
-          name="description" 
-          value={formData.description} 
-          onChange={handleChange} 
-          maxLength={2000}
-          aria-invalid={!!(validationErrors.description || fieldErrors.description)}
-          style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #d1d5db', width: '100%', minHeight: '100px' }}
-        />
-        {getError('description')}
-      </div>
-      
-      <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
-        <label htmlFor="category" style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Category *</label>
-        <select
-          id="category"
-          name="category"
-          value={formData.category}
-          onChange={handleChange}
-          required
-          aria-invalid={!!(validationErrors.category || fieldErrors.category)}
-          style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #d1d5db', width: '100%', backgroundColor: 'white' }}
-        >
-          <option value="" disabled>Select category</option>
-          {STANDARD_CATEGORIES.map(cat => (
-            <option key={cat} value={cat}>{cat}</option>
-          ))}
-          <option value="Other">Other</option>
-        </select>
-        {getError('category')}
-      </div>
-
-      {formData.category === 'Other' && (
-        <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
-          <label htmlFor="customCategory" style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Specify Category *</label>
+    <form onSubmit={handleSubmit} className="item-form">
+      <div className="form-section">
+        <h3 className="form-section-title">Basic Information</h3>
+        <div className="form-group">
+          <label htmlFor="title">Title *</label>
           <input 
             type="text" 
-            id="customCategory" 
-            name="customCategory" 
-            value={formData.customCategory} 
+            id="title" 
+            name="title" 
+            value={formData.title} 
+            onChange={handleChange} 
+            required 
+            maxLength={200}
+            aria-invalid={!!(validationErrors.title || fieldErrors.title)}
+            placeholder="Enter item title"
+          />
+          {getError('title')}
+        </div>
+        
+        <div className="form-group">
+          <label htmlFor="description">Description</label>
+          <textarea 
+            id="description" 
+            name="description" 
+            value={formData.description} 
+            onChange={handleChange} 
+            maxLength={2000}
+            aria-invalid={!!(validationErrors.description || fieldErrors.description)}
+            placeholder="Describe the item's condition, features, etc."
+          />
+          {getError('description')}
+        </div>
+      </div>
+
+      <div className="form-section">
+        <h3 className="form-section-title">Categorization & Location</h3>
+        <div className="form-group">
+          <label htmlFor="category">Category *</label>
+          <select
+            id="category"
+            name="category"
+            value={formData.category}
+            onChange={handleChange}
+            required
+            aria-invalid={!!(validationErrors.category || fieldErrors.category)}
+            className="items-filter-select"
+          >
+            <option value="" disabled>Select category</option>
+            {STANDARD_CATEGORIES.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+            <option value="Other">Other</option>
+          </select>
+          {getError('category')}
+        </div>
+
+        {formData.category === 'Other' && (
+          <div className="form-group">
+            <label htmlFor="customCategory">Specify Category *</label>
+            <input 
+              type="text" 
+              id="customCategory" 
+              name="customCategory" 
+              value={formData.customCategory} 
+              onChange={handleChange} 
+              required 
+              maxLength={100}
+              aria-invalid={!!(validationErrors.customCategory || fieldErrors.category)}
+              placeholder="e.g. Bicycle"
+            />
+            {getError('customCategory')}
+          </div>
+        )}
+        
+        <div className="form-group">
+          <label htmlFor="locationArea">Location Area *</label>
+          <input 
+            type="text" 
+            id="locationArea" 
+            name="locationArea" 
+            value={formData.locationArea} 
             onChange={handleChange} 
             required 
             maxLength={100}
-            aria-invalid={!!(validationErrors.customCategory || fieldErrors.category)}
-            placeholder="e.g. Bicycle"
-            style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #d1d5db', width: '100%' }}
+            aria-invalid={!!(validationErrors.locationArea || fieldErrors.locationArea)}
+            placeholder="e.g. Warehouse A, Shelf 3"
           />
-          {getError('customCategory')}
+          {getError('locationArea')}
         </div>
-      )}
-      
-      <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
-        <label htmlFor="locationArea" style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Location Area *</label>
-        <input 
-          type="text" 
-          id="locationArea" 
-          name="locationArea" 
-          value={formData.locationArea} 
-          onChange={handleChange} 
-          required 
-          maxLength={100}
-          aria-invalid={!!(validationErrors.locationArea || fieldErrors.locationArea)}
-          style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #d1d5db', width: '100%' }}
-        />
-        {getError('locationArea')}
       </div>
       
-      <div className="form-actions" style={{ marginTop: '0.5rem' }}>
-        <button type="submit" className="btn-primary" disabled={isSubmitting} style={{ padding: '0.5rem 1.5rem', fontWeight: 'bold' }}>
+      <div className="form-actions">
+        <button type="submit" className="btn-primary" disabled={isSubmitting}>
           {isSubmitting ? 'Saving...' : 'Save Item'}
         </button>
       </div>

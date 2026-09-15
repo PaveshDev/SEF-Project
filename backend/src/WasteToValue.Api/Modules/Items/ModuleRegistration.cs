@@ -7,7 +7,7 @@ public static class ModuleRegistration
 {
     public static IServiceCollection AddItemsModule(this IServiceCollection services)
     {
-        services.AddSingleton<IItemRepository, InMemoryItemRepository>();
+        services.AddScoped<IItemRepository, ItemRepository>();
         services.AddScoped<IItemService, ItemService>();
         return services;
     }

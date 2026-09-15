@@ -159,32 +159,43 @@ public class ItemService(IItemRepository repository) : IItemService
         if (item.Status != ItemStatus.Draft && item.Status != ItemStatus.AwaitingOwnerConfirmation)
             throw new InvalidOperationException("Condition answers can only be updated when in Draft or Awaiting Confirmation.");
 
-        // Clear existing answers or update them
-        foreach (var existing in item.ConditionAnswers.ToList())
-        {
-            // Simple approach: remove old, add new
-            // In a real scenario, we might merge them
-        }
-        
-        item.ConditionAnswers.Clear(); // Assume complete replacement for simplicity
+        var newAnswersDict = request.Answers.ToDictionary(a => a.QuestionCode);
+        var existingAnswersDict = item.ConditionAnswers.ToDictionary(a => a.QuestionCode);
 
+        // Update or add answers
         foreach (var answerDto in request.Answers)
         {
-            item.ConditionAnswers.Add(new ItemConditionAnswer
+            if (existingAnswersDict.TryGetValue(answerDto.QuestionCode, out var existingAnswer))
             {
-                Id = Guid.NewGuid(),
-                ItemId = item.Id,
-                QuestionCode = answerDto.QuestionCode,
-                QuestionText = answerDto.QuestionText,
-                Answer = answerDto.Answer,
-                AnsweredAt = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow
-            });
+                existingAnswer.QuestionText = answerDto.QuestionText;
+                existingAnswer.Answer = answerDto.Answer;
+                existingAnswer.AnsweredAt = DateTime.UtcNow;
+                existingAnswer.UpdatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                item.ConditionAnswers.Add(new ItemConditionAnswer
+                {
+                    ItemId = item.Id,
+                    QuestionCode = answerDto.QuestionCode,
+                    QuestionText = answerDto.QuestionText,
+                    Answer = answerDto.Answer,
+                    AnsweredAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+        }
+        
+        // Remove answers that are not in the request
+        var codesToRemove = existingAnswersDict.Keys.Except(newAnswersDict.Keys).ToList();
+        foreach (var code in codesToRemove)
+        {
+            var answerToRemove = existingAnswersDict[code];
+            item.ConditionAnswers.Remove(answerToRemove);
         }
 
         item.UpdatedAt = DateTime.UtcNow;
 
-        repository.Update(item);
         await repository.SaveChangesAsync(cancellationToken);
 
         return item.ConditionAnswers.Select(x => x.ToResponse()).ToList();

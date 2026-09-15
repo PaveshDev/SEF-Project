@@ -43,13 +43,20 @@ export function CreateItemPage() {
 
   return (
     <div className="items-module-container">
-      <div className="items-card">
+      <div className="items-card items-card-narrow">
         <div className="items-page-header">
           <h2>Create New Item</h2>
           <p>Provide the basic details about the item you want to submit for assessment.</p>
         </div>
         
-        {error && <div className="error-alert" role="alert">{error}</div>}
+        {error && (
+          <div className="error-alert" role="alert">
+            <svg style={{ width: '24px', height: '24px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            {error}
+          </div>
+        )}
         
         <ItemForm 
           onSubmit={handleSubmit} 

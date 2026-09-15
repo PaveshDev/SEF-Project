@@ -19,25 +19,23 @@ export function PhotoManager({ photos, onAddPhoto }) {
 
   return (
     <div className="photo-manager">
-      <h3>Photos</h3>
-      <div className="photos-list" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
-        {photos?.length === 0 && <p>No photos added yet.</p>}
+      <div className="photo-gallery" style={{ marginBottom: '24px' }}>
+        {photos?.length === 0 && <p style={{ color: '#6b7280', gridColumn: '1 / -1' }}>No photos added yet.</p>}
         {photos?.map(photo => (
-          <div key={photo.id} style={{ border: '1px solid #ccc', padding: '5px' }}>
-            <img src={photo.imageUrl} alt="Item" style={{ width: '100px', height: '100px', objectFit: 'cover' }} />
-          </div>
+          <img key={photo.id} src={photo.imageUrl} alt="Item" className="photo-thumbnail" />
         ))}
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '10px' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '12px' }}>
         <input
           type="url"
-          placeholder="Image URL"
+          placeholder="Enter image URL..."
           value={imageUrl}
           onChange={(e) => setImageUrl(e.target.value)}
           required
+          style={{ flex: 1, padding: '10px 16px', borderRadius: '8px', border: '1px solid #d1d5db', fontFamily: 'inherit' }}
         />
-        <button type="submit" disabled={isSubmitting || !imageUrl.trim()}>
+        <button type="submit" className="btn-secondary" disabled={isSubmitting || !imageUrl.trim()}>
           {isSubmitting ? 'Adding...' : 'Add Photo'}
         </button>
       </form>

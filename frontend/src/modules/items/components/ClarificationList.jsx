@@ -71,44 +71,43 @@ function ClarificationItem({ clarification, onAnswer }) {
   };
 
   return (
-    <div style={{ border: `1px solid ${isAnswered ? '#bbf7d0' : '#fde68a'}`, backgroundColor: isAnswered ? '#f0fdf4' : '#fffbeb', padding: '1.25rem', borderRadius: '0.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: `1px solid ${isAnswered ? '#bbf7d0' : '#fde68a'}`, paddingBottom: '0.5rem' }}>
-        <span style={{ fontWeight: '600', color: isAnswered ? '#166534' : '#92400e' }}>
+    <div className={`clarification-item ${isAnswered ? 'answered' : 'pending'}`}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px solid #e5e7eb', paddingBottom: '8px' }}>
+        <span style={{ fontWeight: '500', color: '#6b7280', fontSize: '14px' }}>
           Requested on {formatDate(clarification.createdAt)}
         </span>
-        <span style={{ fontWeight: '600', color: isAnswered ? '#166534' : '#92400e' }}>
-          Status: {clarification.status}
+        <span style={{ fontWeight: '600', color: isAnswered ? '#10b981' : '#f59e0b', fontSize: '14px' }}>
+          {clarification.status}
         </span>
       </div>
       
-      <div style={{ marginBottom: '1rem' }}>
-        <p style={{ fontWeight: '700', color: '#111827', margin: '0 0 0.25rem 0' }}>Q: {clarification.question}</p>
-        <p style={{ margin: 0, color: '#4b5563', fontSize: '0.9rem' }}><em>Reason: {clarification.reason}</em></p>
+      <div>
+        <p className="clarification-q">Q: {clarification.question}</p>
+        <p className="clarification-reason">Reason: {clarification.reason}</p>
       </div>
       
       {isAnswered ? (
-        <div style={{ backgroundColor: '#dcfce7', padding: '1rem', borderRadius: '0.375rem', border: '1px solid #bbf7d0' }}>
-          <p style={{ margin: '0 0 0.25rem 0', fontWeight: '600', color: '#166534' }}>Your Answer:</p>
-          <p style={{ margin: '0 0 0.5rem 0', color: '#14532d' }}>{clarification.answer}</p>
-          <p style={{ margin: 0, fontSize: '0.8rem', color: '#166534' }}>Answered on {formatDate(clarification.answeredAt)}</p>
+        <div className="clarification-answer-box">
+          <p style={{ margin: '0 0 4px 0', fontWeight: '600', color: '#111827', fontSize: '14px' }}>Your Answer:</p>
+          <p style={{ margin: '0 0 8px 0', color: '#374151', lineHeight: '1.5' }}>{clarification.answer}</p>
+          <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>Answered on {formatDate(clarification.answeredAt)}</p>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', backgroundColor: 'white', padding: '1rem', borderRadius: '0.375rem', border: '1px solid #fde68a' }}>
-          <label htmlFor={`answer-${clarification.id}`} style={{ fontWeight: '600', fontSize: '0.9rem', color: '#92400e' }}>Provide your answer:</label>
+        <form onSubmit={handleSubmit} className="clarification-answer-box pending" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <label htmlFor={`answer-${clarification.id}`} style={{ fontWeight: '600', fontSize: '14px', color: '#111827' }}>Provide your answer:</label>
           <textarea
             id={`answer-${clarification.id}`}
             placeholder="Type your detailed answer here..."
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
             required
-            style={{ width: '100%', padding: '0.75rem', borderRadius: '0.25rem', border: '1px solid #d1d5db', minHeight: '80px', fontFamily: 'inherit' }}
+            style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db', minHeight: '100px', fontFamily: 'inherit', boxSizing: 'border-box' }}
           />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button 
               type="submit" 
               disabled={isSubmitting || !answer.trim()}
-              className="btn-primary"
-              style={{ backgroundColor: '#f59e0b', color: 'white', padding: '0.5rem 1.5rem', border: 'none', borderRadius: '0.25rem', cursor: (isSubmitting || !answer.trim()) ? 'not-allowed' : 'pointer', fontWeight: '600', opacity: (isSubmitting || !answer.trim()) ? 0.7 : 1 }}
+              className="btn-warning"
             >
               {isSubmitting ? 'Sending...' : 'Submit Answer'}
             </button>
