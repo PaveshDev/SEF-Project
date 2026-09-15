@@ -79,7 +79,7 @@ void main() {
     apiClient.httpClientAdapter = MockDioAdapter((options) async {
       if (options.path == '/api/items') {
         final data = [
-          {'id': '1', 'title': 'Laptop', 'category': 'Electronics', 'locationArea': 'Room A', 'status': 'Draft', 'createdAt': '2026-09-10T12:00:00Z'}
+          {'id': '1', 'title': 'Dell Latitude 5420', 'category': 'Electronics', 'locationArea': 'Colombo', 'status': 'Draft', 'createdAt': '2026-09-10T12:00:00Z'}
         ];
         return ResponseBody.fromString(jsonEncode(data), 200, headers: {Headers.contentTypeHeader: ['application/json']});
       }
@@ -89,8 +89,9 @@ void main() {
     await tester.pumpWidget(createTestApp(const MyItemsScreen()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Laptop'), findsOneWidget);
-    expect(find.text('Electronics • Room A'), findsOneWidget);
+    expect(find.text('Dell Latitude 5420'), findsOneWidget);
+    expect(find.text('Electronics'), findsOneWidget);
+    expect(find.text('Colombo'), findsOneWidget);
   });
 
   testWidgets('2. Empty item list displays empty state', (WidgetTester tester) async {
@@ -112,7 +113,7 @@ void main() {
     apiClient.httpClientAdapter = MockDioAdapter((options) async {
       if (options.path == '/api/items' && options.method == 'POST') {
         apiCalled = true;
-        final data = {'id': '2', 'title': 'Phone', 'category': 'Electronics', 'locationArea': 'A', 'status': 'Draft', 'createdAt': '2026-09-10T12:00:00Z'};
+        final data = {'id': '2', 'title': 'Samsung Microwave Oven', 'category': 'Electronics', 'locationArea': 'Negombo', 'status': 'Draft', 'createdAt': '2026-09-10T12:00:00Z'};
         return ResponseBody.fromString(jsonEncode(data), 200, headers: {Headers.contentTypeHeader: ['application/json']});
       }
       return ResponseBody.fromString('Not Found', 404);
@@ -121,10 +122,13 @@ void main() {
     await tester.pumpWidget(createRouterApp('/items/create'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'Phone');
-    await tester.enterText(find.byType(TextFormField).at(1), 'A good phone');
-    await tester.enterText(find.byType(TextFormField).at(2), 'Electronics');
-    await tester.enterText(find.byType(TextFormField).at(3), 'Room A');
+    await tester.enterText(find.byType(TextFormField).at(0), 'Samsung Microwave Oven');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Microwave oven with visible external wear.');
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Electronics').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).at(2), 'Colombo');
     
     await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
@@ -137,8 +141,8 @@ void main() {
     apiClient.httpClientAdapter = MockDioAdapter((options) async {
       if (options.path == '/api/items/1') {
         final data = {
-          'id': '1', 'ownerId': 'user1', 'title': 'Laptop', 'description': 'desc', 'category': 'Electronics', 
-          'locationArea': 'Room A', 'status': 'Draft', 'createdAt': '2026-09-10T12:00:00Z', 'version': 1,
+          'id': '1', 'ownerId': 'user1', 'title': 'Dell Latitude 5420', 'description': 'Used laptop in working condition.', 'category': 'Electronics', 
+          'locationArea': 'Colombo', 'status': 'Draft', 'createdAt': '2026-09-10T12:00:00Z', 'version': 1,
           'photos': [], 'conditionAnswers': [], 'assessments': []
         };
         return ResponseBody.fromString(jsonEncode(data), 200, headers: {Headers.contentTypeHeader: ['application/json']});
@@ -149,8 +153,8 @@ void main() {
     await tester.pumpWidget(createTestApp(const ItemDetailsScreen(itemId: '1')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Laptop'), findsOneWidget);
-    expect(find.text('Status: Draft'), findsOneWidget);
+    expect(find.text('Dell Latitude 5420'), findsOneWidget);
+    expect(find.text('Draft'), findsOneWidget);
   });
 
   testWidgets('5. 400 validation error is displayed', (WidgetTester tester) async {
@@ -165,9 +169,12 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextFormField).at(0), 'T');
-    await tester.enterText(find.byType(TextFormField).at(1), 'desc');
-    await tester.enterText(find.byType(TextFormField).at(2), 'cat');
-    await tester.enterText(find.byType(TextFormField).at(3), 'loc');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Used laptop in working condition.');
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Electronics').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).at(2), 'loc');
     
     await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
@@ -193,7 +200,7 @@ void main() {
     apiClient.httpClientAdapter = MockDioAdapter((options) async {
       if (options.method == 'GET' && options.path == '/api/items/1') {
         final data = {
-          'id': '1', 'ownerId': 'user1', 'title': 'Laptop', 'description': 'desc', 'category': 'cat', 
+          'id': '1', 'ownerId': 'user1', 'title': 'Dell Latitude 5420', 'description': 'Used laptop in working condition.', 'category': 'Electronics', 
           'locationArea': 'loc', 'status': 'Draft', 'createdAt': '2026-09-10T12:00:00Z', 'version': 1,
           'photos': [], 'conditionAnswers': [], 'assessments': []
         };
@@ -208,7 +215,7 @@ void main() {
     await tester.pumpWidget(createRouterApp('/items/1/edit'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'Laptop 2');
+    await tester.enterText(find.byType(TextFormField).at(0), 'Office Chair');
     await tester.tap(find.text('Save Changes'));
     await tester.pumpAndSettle();
 
@@ -228,10 +235,15 @@ void main() {
     await tester.pumpWidget(createRouterApp('/items/1/condition-answers'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'Yes');
-    await tester.enterText(find.byType(TextFormField).at(1), 'No');
+    await tester.tap(find.text('Yes').at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('No').at(1));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextFormField).at(0), 'powers on fine');
+    await tester.enterText(find.byType(TextFormField).at(1), 'no scratches');
     
-    await tester.tap(find.text('Submit Answers'));
+    await tester.tap(find.text('Save Answers'));
     await tester.pumpAndSettle();
 
     expect(apiCalled, true);
@@ -243,7 +255,7 @@ void main() {
     apiClient.httpClientAdapter = MockDioAdapter((options) async {
       if (options.path == '/api/items/1') {
         final data = {
-          'id': '1', 'ownerId': 'user1', 'title': 'Laptop', 'description': 'desc', 'category': 'cat', 
+          'id': '1', 'ownerId': 'user1', 'title': 'Dell Latitude 5420', 'description': 'Used laptop in working condition.', 'category': 'Electronics', 
           'locationArea': 'loc', 'status': 'Draft', 'createdAt': '2026-09-10T12:00:00Z', 'version': 1,
           'photos': [], 'conditionAnswers': [], 'assessments': []
         };
@@ -259,7 +271,9 @@ void main() {
     await tester.pumpWidget(createTestApp(const ItemDetailsScreen(itemId: '1')));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Submit for Assessment'));
+    final submitButton = find.text('Submit for Assessment');
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
     await tester.pumpAndSettle();
 
     expect(apiCalled, true);
@@ -283,7 +297,7 @@ void main() {
     await tester.pumpWidget(createTestApp(const AssessmentScreen(itemId: '1', assessmentId: 'a1')));
     await tester.pumpAndSettle();
 
-    expect(find.text('AI ASSESSMENT'), findsOneWidget);
+    expect(find.text('AI OBSERVATIONS'), findsOneWidget);
     expect(find.text('OWNER REPORTED'), findsOneWidget);
     expect(find.text('Working fine'), findsOneWidget);
   });

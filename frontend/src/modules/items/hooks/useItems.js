@@ -30,5 +30,10 @@ export function useItems() {
     return newItem;
   };
 
-  return { items, isLoading, error, fetchItems, createItem };
+  const deleteItem = async (id) => {
+    await itemsApi.deleteItem(id);
+    setItems((prev) => prev.filter(item => item.id !== id));
+  };
+
+  return { items, isLoading, error, fetchItems, createItem, deleteItem };
 }

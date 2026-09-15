@@ -4,7 +4,7 @@ import { useItems } from '../hooks/useItems';
 import '../styles/items.css';
 
 export function ItemsListPage() {
-  const { items, isLoading, error } = useItems();
+  const { items, isLoading, error, deleteItem } = useItems();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -60,115 +60,103 @@ export function ItemsListPage() {
   }, [items]);
 
   if (isLoading) return (
-    <div className="items-module-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
-      <div style={{ fontSize: '1.2rem', color: '#6b7280' }}>Loading your items...</div>
+    <div className="items-module-container">
+      <div className="items-loading-spinner"></div>
+      <div style={{ textAlign: 'center', color: '#6b7280' }}>Loading your items...</div>
     </div>
   );
 
   return (
-    <div className="items-module-container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
+    <div className="items-module-container">
       
       {/* Header */}
-      <div className="items-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="items-page-header">
         <div>
-          <h1 style={{ fontSize: '2.25rem', fontWeight: '800', margin: '0 0 0.5rem 0', color: '#111827' }}>MY ITEMS</h1>
-          <p style={{ margin: 0, color: '#4b5563', fontSize: '1.1rem' }}>Manage and track the items you have submitted or are drafting.</p>
+          <h2>MY ITEMS</h2>
+          <p>Manage and track the items you have submitted or are drafting.</p>
         </div>
-        <Link 
-          to="/items/new" 
-          className="btn-primary" 
-          style={{ padding: '0.75rem 1.5rem', fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#4f46e5', color: 'white', textDecoration: 'none', borderRadius: '0.375rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-        >
-          <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>+</span> Add New Item
+        <Link to="/items/new" className="btn-primary">
+          <span style={{ fontSize: '1.25rem', marginRight: '8px' }}>+</span> Add New Item
         </Link>
       </div>
       
       {error && (
-        <div className="error-alert" role="alert" style={{ backgroundColor: '#fee2e2', border: '1px solid #ef4444', color: '#b91c1c', padding: '1rem', borderRadius: '0.375rem', marginBottom: '2rem' }}>
+        <div className="error-alert" role="alert">
           <strong>Error loading items:</strong> {error}
         </div>
       )}
       
       {!error && items.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '4rem 2rem', backgroundColor: '#f9fafb', borderRadius: '0.5rem', border: '2px dashed #d1d5db' }}>
-          <h3 style={{ fontSize: '1.5rem', color: '#374151', marginBottom: '1rem' }}>You have not created any items yet</h3>
-          <p style={{ color: '#6b7280', marginBottom: '2rem' }}>Start by adding your first item to be assessed.</p>
-          <Link to="/items/new" className="btn-primary" style={{ padding: '0.75rem 1.5rem', fontSize: '1rem', fontWeight: 'bold', textDecoration: 'none' }}>+ Create Your First Item</Link>
+        <div className="items-empty-state">
+          <svg style={{ width: '48px', height: '48px', margin: '0 auto', color: '#9ca3af' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+          </svg>
+          <h3>You have not created any items yet</h3>
+          <p style={{ marginBottom: '24px' }}>Start by adding your first item to be assessed.</p>
+          <Link to="/items/new" className="btn-primary">Create Your First Item</Link>
         </div>
       )}
 
       {items.length > 0 && stats && (
         <>
           {/* Dashboard Section */}
-          <div style={{ marginBottom: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            <div style={{ backgroundColor: '#eff6ff', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #bfdbfe' }}>
-              <div style={{ color: '#1e40af', fontSize: '0.875rem', fontWeight: '600', textTransform: 'uppercase' }}>Total Items</div>
-              <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#1d4ed8' }}>{stats.total}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+            <div className="items-card" style={{ padding: '24px' }}>
+              <div style={{ color: '#1e40af', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}>Total Items</div>
+              <div style={{ fontSize: '36px', fontWeight: '800', color: '#1d4ed8' }}>{stats.total}</div>
             </div>
-            <div style={{ backgroundColor: '#f3f4f6', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}>
-              <div style={{ color: '#374151', fontSize: '0.875rem', fontWeight: '600', textTransform: 'uppercase' }}>Drafts</div>
-              <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#111827' }}>{stats.Draft}</div>
+            <div className="items-card" style={{ padding: '24px' }}>
+              <div style={{ color: '#374151', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}>Drafts</div>
+              <div style={{ fontSize: '36px', fontWeight: '800', color: '#111827' }}>{stats.Draft}</div>
             </div>
-            <div style={{ backgroundColor: '#fef3c7', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #fde68a' }}>
-              <div style={{ color: '#92400e', fontSize: '0.875rem', fontWeight: '600', textTransform: 'uppercase' }}>In Progress</div>
-              <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#b45309' }}>{stats.Submitted + stats.Assessing}</div>
+            <div className="items-card" style={{ padding: '24px' }}>
+              <div style={{ color: '#92400e', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}>In Progress</div>
+              <div style={{ fontSize: '36px', fontWeight: '800', color: '#b45309' }}>{stats.Submitted + stats.Assessing}</div>
             </div>
-            <div style={{ backgroundColor: '#f0fdf4', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #bbf7d0' }}>
-              <div style={{ color: '#166534', fontSize: '0.875rem', fontWeight: '600', textTransform: 'uppercase' }}>Confirmed</div>
-              <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#15803d' }}>{stats.Confirmed}</div>
+            <div className="items-card" style={{ padding: '24px' }}>
+              <div style={{ color: '#166534', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}>Confirmed</div>
+              <div style={{ fontSize: '36px', fontWeight: '800', color: '#15803d' }}>{stats.Confirmed}</div>
             </div>
-            <div style={{ backgroundColor: '#fef2f2', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #fecaca' }}>
-              <div style={{ color: '#991b1b', fontSize: '0.875rem', fontWeight: '600', textTransform: 'uppercase' }}>Action Required</div>
-              <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#b91c1c' }}>{stats.PendingConfirmation + stats.ReassessmentRequested}</div>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '2rem', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-            {/* Top Categories */}
-            <div style={{ flex: '1', minWidth: '300px', backgroundColor: 'white', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)' }}>
-              <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#374151', fontSize: '1.1rem' }}>Category Distribution</h3>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {Object.entries(stats.categories).sort((a,b)=>b[1]-a[1]).map(([cat, count]) => (
-                  <span key={cat} style={{ backgroundColor: '#f3f4f6', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.875rem', color: '#4b5563', border: '1px solid #d1d5db' }}>
-                    {cat}: <strong>{count}</strong>
-                  </span>
-                ))}
-              </div>
+            <div className="items-card" style={{ padding: '24px', borderLeft: '4px solid #ef4444' }}>
+              <div style={{ color: '#991b1b', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}>Action Required</div>
+              <div style={{ fontSize: '36px', fontWeight: '800', color: '#b91c1c' }}>{stats.PendingConfirmation + stats.ReassessmentRequested}</div>
             </div>
           </div>
 
           {/* Filters */}
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', backgroundColor: '#f9fafb', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}>
+          <div className="items-filter-bar">
             <div style={{ flex: '1', minWidth: '200px' }}>
-              <label htmlFor="search" style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '0.25rem' }}>Search</label>
+              <label htmlFor="search" style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: '8px', textTransform: 'uppercase' }}>Search</label>
               <input 
                 id="search"
                 type="text" 
+                className="items-filter-input"
                 placeholder="Search title, desc, category..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ width: '100%', padding: '0.5rem', borderRadius: '0.25rem', border: '1px solid #d1d5db' }}
               />
             </div>
             <div style={{ width: '200px' }}>
-              <label htmlFor="categoryFilter" style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '0.25rem' }}>Category</label>
+              <label htmlFor="categoryFilter" style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: '8px', textTransform: 'uppercase' }}>Category</label>
               <select 
                 id="categoryFilter"
+                className="items-filter-select"
                 value={categoryFilter} 
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                style={{ width: '100%', padding: '0.5rem', borderRadius: '0.25rem', border: '1px solid #d1d5db', backgroundColor: 'white' }}
+                style={{ width: '100%' }}
               >
                 <option value="">All Categories</option>
                 {uniqueCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
               </select>
             </div>
             <div style={{ width: '200px' }}>
-              <label htmlFor="statusFilter" style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '0.25rem' }}>Status</label>
+              <label htmlFor="statusFilter" style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: '8px', textTransform: 'uppercase' }}>Status</label>
               <select 
                 id="statusFilter"
+                className="items-filter-select"
                 value={statusFilter} 
                 onChange={(e) => setStatusFilter(e.target.value)}
-                style={{ width: '100%', padding: '0.5rem', borderRadius: '0.25rem', border: '1px solid #d1d5db', backgroundColor: 'white' }}
+                style={{ width: '100%' }}
               >
                 <option value="">All Statuses</option>
                 <option value="Draft">Draft</option>
@@ -182,7 +170,7 @@ export function ItemsListPage() {
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
               <button 
                 onClick={handleClearFilters}
-                style={{ padding: '0.5rem 1rem', backgroundColor: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '0.25rem', cursor: 'pointer', fontWeight: '500' }}
+                className="btn-secondary"
               >
                 Clear Filters
               </button>
@@ -190,39 +178,59 @@ export function ItemsListPage() {
           </div>
 
           {/* Table */}
-          <div className="items-table-container" style={{ overflowX: 'auto', backgroundColor: 'white', borderRadius: '0.5rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)' }}>
-            <table className="items-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+          <div className="items-table-container">
+            <table className="items-table">
+              <thead>
                 <tr>
-                  <th style={{ padding: '1rem', color: '#374151', fontWeight: '600' }}>Title</th>
-                  <th style={{ padding: '1rem', color: '#374151', fontWeight: '600' }}>Category</th>
-                  <th style={{ padding: '1rem', color: '#374151', fontWeight: '600' }}>Location</th>
-                  <th style={{ padding: '1rem', color: '#374151', fontWeight: '600' }}>Status</th>
-                  <th style={{ padding: '1rem', color: '#374151', fontWeight: '600' }}>Date</th>
-                  <th style={{ padding: '1rem', color: '#374151', fontWeight: '600', textAlign: 'right' }}>Actions</th>
+                  <th>Title</th>
+                  <th>Category</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
-              <tbody style={{ divideY: '1px solid #e5e7eb' }}>
+              <tbody>
                 {filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                    <td colSpan="6" style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
                       No items match your current filters.
                     </td>
                   </tr>
                 ) : (
                   filteredItems.map(item => (
-                    <tr key={item.id} style={{ borderBottom: '1px solid #e5e7eb', transition: 'background-color 0.2s' }}>
-                      <td style={{ padding: '1rem', fontWeight: '500', color: '#111827' }}>{item.title}</td>
-                      <td style={{ padding: '1rem', color: '#4b5563' }}>{item.category}</td>
-                      <td style={{ padding: '1rem', color: '#4b5563' }}>{item.locationArea}</td>
-                      <td style={{ padding: '1rem' }}>
-                        <span className={`status-badge status-${item.status.toLowerCase()}`} style={{ display: 'inline-block', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: '600' }}>
+                    <tr key={item.id}>
+                      <td style={{ fontWeight: '600', color: '#111827' }}>{item.title}</td>
+                      <td>{item.category}</td>
+                      <td>{item.locationArea}</td>
+                      <td>
+                        <span className={`status-badge status-${item.status.toLowerCase()}`}>
                           {item.status.replace(/([A-Z])/g, ' $1').trim()}
                         </span>
                       </td>
-                      <td style={{ padding: '1rem', color: '#4b5563', fontSize: '0.875rem' }}>{new Date(item.createdAt).toLocaleDateString()}</td>
-                      <td style={{ padding: '1rem', textAlign: 'right' }}>
-                        <Link to={`/items/${item.id}`} className="table-action-link" style={{ color: '#4f46e5', fontWeight: '600', textDecoration: 'none', padding: '0.5rem 1rem', border: '1px solid #e0e7ff', borderRadius: '0.25rem', backgroundColor: '#e0e7ff' }}>View</Link>
+                      <td style={{ color: '#6b7280', fontSize: '13px' }}>{new Date(item.createdAt).toLocaleDateString()}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                          <Link to={`/items/${item.id}`} className="table-action-link">View Details</Link>
+                          {(item.status === 'Draft' || item.status === 'Withdrawn') && (
+                            <button 
+                              onClick={async (e) => {
+                                e.preventDefault();
+                                if (window.confirm("Are you sure you want to delete this item? This action cannot be undone.")) {
+                                  try {
+                                    await deleteItem(item.id);
+                                  } catch (err) {
+                                    alert('Failed to delete item.');
+                                  }
+                                }
+                              }}
+                              className="table-action-link"
+                              style={{ color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))

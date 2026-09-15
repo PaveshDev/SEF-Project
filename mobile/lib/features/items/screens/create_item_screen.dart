@@ -16,33 +16,48 @@ class _CreateItemScreenState extends State<CreateItemScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _categoryController = TextEditingController();
+  final _customCategoryController = TextEditingController();
   final _locationController = TextEditingController();
   
   final ItemsService _itemsService = ItemsService();
   bool _isSubmitting = false;
 
+  String? _selectedCategory;
+  final List<String> _standardCategories = [
+    'Electronics',
+    'Furniture',
+    'Appliances',
+    'Clothing',
+    'Books'
+  ];
+
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _categoryController.dispose();
+    _customCategoryController.dispose();
     _locationController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedCategory == null) return;
 
     setState(() {
       _isSubmitting = true;
     });
 
     try {
+      String finalCategory = _selectedCategory!;
+      if (_selectedCategory == 'Other') {
+        finalCategory = _customCategoryController.text.trim();
+      }
+
       final request = CreateItemRequest(
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
-        category: _categoryController.text.trim(),
+        category: finalCategory,
         locationArea: _locationController.text.trim(),
       );
 
@@ -52,8 +67,6 @@ class _CreateItemScreenState extends State<CreateItemScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Item created successfully')),
         );
-        // Pop and pass back true to indicate success (so the list refreshes)
-        // Optionally redirect to details screen instead.
         context.pop(true);
         context.push('/items/${createdItem.id}');
       }
@@ -92,11 +105,15 @@ class _CreateItemScreenState extends State<CreateItemScreen> {
               TextFormField(
                 controller: _titleController,
                 decoration: const InputDecoration(
-                  labelText: 'Title',
+                  labelText: 'Title *',
                   border: OutlineInputBorder(),
                 ),
-                validator: (value) =>
-                    value == null || value.isEmpty ? 'Title is required' : null,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) return 'Title is required';
+                  if (!RegExp(r'[a-zA-Z]').hasMatch(value)) return 'Title must contain at least one letter.';
+                  if (value.trim().length > 200) return 'Title cannot exceed 200 characters';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -106,42 +123,72 @@ class _CreateItemScreenState extends State<CreateItemScreen> {
                   border: OutlineInputBorder(),
                 ),
                 maxLines: 3,
-                validator: (value) => value == null || value.isEmpty
-                    ? 'Description is required'
-                    : null,
+                validator: (value) {
+                  if (value != null && value.trim().length > 2000) return 'Description cannot exceed 2000 characters';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _categoryController,
+              DropdownButtonFormField<String>(
                 decoration: const InputDecoration(
-                  labelText: 'Category',
+                  labelText: 'Category *',
                   border: OutlineInputBorder(),
                 ),
-                validator: (value) => value == null || value.isEmpty
-                    ? 'Category is required'
-                    : null,
+                value: _selectedCategory,
+                items: [
+                  ..._standardCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))),
+                  const DropdownMenuItem(value: 'Other', child: Text('Other')),
+                ],
+                onChanged: (val) {
+                  setState(() {
+                    _selectedCategory = val;
+                  });
+                },
+                validator: (value) => value == null ? 'Category is required' : null,
               ),
+              if (_selectedCategory == 'Other') ...[
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _customCategoryController,
+                  decoration: const InputDecoration(
+                    labelText: 'Specify Category *',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (_selectedCategory == 'Other') {
+                      if (value == null || value.trim().isEmpty) return 'Specify Category is required';
+                      if (value.trim().length > 100) return 'Category cannot exceed 100 characters';
+                    }
+                    return null;
+                  },
+                ),
+              ],
               const SizedBox(height: 16),
               TextFormField(
                 controller: _locationController,
                 decoration: const InputDecoration(
-                  labelText: 'Location Area',
+                  labelText: 'Location Area *',
                   border: OutlineInputBorder(),
                 ),
-                validator: (value) => value == null || value.isEmpty
-                    ? 'Location Area is required'
-                    : null,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) return 'Location Area is required';
+                  if (value.trim().length > 100) return 'Location Area cannot exceed 100 characters';
+                  return null;
+                },
               ),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _isSubmitting ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
                 child: _isSubmitting
                     ? const SizedBox(
                         height: 20,
                         width: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Create'),
+                    : const Text('Create', style: TextStyle(fontSize: 16)),
               ),
             ],
           ),

@@ -10,6 +10,7 @@ public class UpdateItemRequest
 
     [Required(ErrorMessage = "Title is required")]
     [StringLength(200, MinimumLength = 1)]
+    [RegularExpression(@".*[a-zA-Z].*", ErrorMessage = "Title must contain at least one letter.")]
     public string Title { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Description is required")]

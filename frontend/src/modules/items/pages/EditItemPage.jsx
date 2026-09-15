@@ -13,12 +13,29 @@ export function EditItemPage() {
   const [submitError, setSubmitError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
 
-  if (isLoading) return <div className="items-module-container">Loading item for edit...</div>;
-  if (error) return <div className="items-module-container"><div className="error-alert">Error loading item: {error.message}</div></div>;
-  if (!item) return <div className="items-module-container">Item not found.</div>;
+  if (isLoading) return (
+    <div className="items-module-container">
+      <div className="items-loading-spinner"></div>
+      <div style={{ textAlign: 'center', color: '#6b7280' }}>Loading item for edit...</div>
+    </div>
+  );
+  if (error) return (
+    <div className="items-module-container">
+      <div className="error-alert">Error loading item: {error.message}</div>
+    </div>
+  );
+  if (!item) return (
+    <div className="items-module-container">
+      <div className="items-empty-state">Item not found.</div>
+    </div>
+  );
   
   if (item.status !== 'Draft') {
-    return <div className="items-module-container"><div className="error-alert">This item is no longer in Draft status and cannot be edited.</div></div>;
+    return (
+      <div className="items-module-container">
+        <div className="error-alert">This item is no longer in Draft status and cannot be edited.</div>
+      </div>
+    );
   }
 
   const handleSubmit = async (formData) => {
@@ -26,7 +43,6 @@ export function EditItemPage() {
     setSubmitError(null);
     setFieldErrors({});
     try {
-      // Must include the current Version from the backend
       const request = {
         id: item.id,
         version: item.version,
@@ -58,7 +74,7 @@ export function EditItemPage() {
 
   return (
     <div className="items-module-container">
-      <div className="items-card">
+      <div className="items-card items-card-narrow">
         <div className="items-page-header">
           <h2>Edit Item</h2>
           <p>Update the details of your draft item.</p>
@@ -66,7 +82,14 @@ export function EditItemPage() {
         
         <ConcurrencyAlert error={concurrencyError} onReload={fetchItem} />
         
-        {submitError && <div className="error-alert" role="alert">{submitError}</div>}
+        {submitError && (
+          <div className="error-alert" role="alert">
+            <svg style={{ width: '24px', height: '24px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            {submitError}
+          </div>
+        )}
         
         {/* Do not allow submission if there's a concurrency error until they reload */}
         {!concurrencyError && (

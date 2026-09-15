@@ -39,17 +39,17 @@ describe('Member 1 Items React Frontend', () => {
       </MemoryRouter>
     );
 
-    fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: 'Test Item' } });
+    fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: 'Dell Latitude 5420' } });
     fireEvent.change(screen.getByLabelText(/Category \*/), { target: { value: 'Electronics' } });
-    fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Shelf A' } });
+    fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Colombo' } });
     
     fireEvent.click(screen.getByRole('button', { name: /Save Item/i }));
 
     await waitFor(() => {
       expect(itemsApi.createItem).toHaveBeenCalledWith(expect.objectContaining({
-        title: 'Test Item',
+        title: 'Dell Latitude 5420',
         category: 'Electronics',
-        locationArea: 'Shelf A'
+        locationArea: 'Colombo'
       }));
     });
 
@@ -69,7 +69,7 @@ describe('Member 1 Items React Frontend', () => {
       
       fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: '' } });
       fireEvent.change(screen.getByLabelText(/Category \*/), { target: { value: 'Electronics' } });
-      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Room A' } });
+      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Kandy' } });
       const form = screen.getByLabelText(/Title \*/).closest('form');
       fireEvent.submit(form);
       
@@ -88,7 +88,7 @@ describe('Member 1 Items React Frontend', () => {
       
       fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: '   ' } });
       fireEvent.change(screen.getByLabelText(/Category \*/), { target: { value: 'Electronics' } });
-      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Room A' } });
+      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Kandy' } });
       fireEvent.click(screen.getByRole('button', { name: /Save Item/i }));
       
       expect(await screen.findByText('Title is required')).toBeInTheDocument();
@@ -106,7 +106,7 @@ describe('Member 1 Items React Frontend', () => {
       
       fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: '12345' } });
       fireEvent.change(screen.getByLabelText(/Category \*/), { target: { value: 'Electronics' } });
-      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Room A' } });
+      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Kandy' } });
       fireEvent.click(screen.getByRole('button', { name: /Save Item/i }));
       
       expect(await screen.findByText('Title must contain at least one letter.')).toBeInTheDocument();
@@ -123,13 +123,13 @@ describe('Member 1 Items React Frontend', () => {
         </MemoryRouter>
       );
       
-      fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: 'Laptop' } });
+      fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: 'Dell Latitude 5420' } });
       fireEvent.change(screen.getByLabelText(/Category \*/), { target: { value: 'Electronics' } });
-      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Room A' } });
+      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Kandy' } });
       fireEvent.click(screen.getByRole('button', { name: /Save Item/i }));
       
       await waitFor(() => {
-        expect(itemsApi.createItem).toHaveBeenCalledWith(expect.objectContaining({ title: 'Laptop' }));
+        expect(itemsApi.createItem).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dell Latitude 5420' }));
       });
     });
 
@@ -143,13 +143,13 @@ describe('Member 1 Items React Frontend', () => {
         </MemoryRouter>
       );
       
-      fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: 'Laptop 15' } });
+      fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: 'Dell Latitude 5420' } });
       fireEvent.change(screen.getByLabelText(/Category \*/), { target: { value: 'Electronics' } });
-      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Room A' } });
+      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Kandy' } });
       fireEvent.click(screen.getByRole('button', { name: /Save Item/i }));
       
       await waitFor(() => {
-        expect(itemsApi.createItem).toHaveBeenCalledWith(expect.objectContaining({ title: 'Laptop 15' }));
+        expect(itemsApi.createItem).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dell Latitude 5420' }));
       });
     });
 
@@ -163,13 +163,13 @@ describe('Member 1 Items React Frontend', () => {
         </MemoryRouter>
       );
       
-      fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: 'Office Chair 2' } });
+      fireEvent.change(screen.getByLabelText(/Title \*/), { target: { value: 'Office Chair' } });
       fireEvent.change(screen.getByLabelText(/Category \*/), { target: { value: 'Electronics' } });
-      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Room A' } });
+      fireEvent.change(screen.getByLabelText(/Location Area \*/), { target: { value: 'Kandy' } });
       fireEvent.click(screen.getByRole('button', { name: /Save Item/i }));
       
       await waitFor(() => {
-        expect(itemsApi.createItem).toHaveBeenCalledWith(expect.objectContaining({ title: 'Office Chair 2' }));
+        expect(itemsApi.createItem).toHaveBeenCalledWith(expect.objectContaining({ title: 'Office Chair' }));
       });
     });
   });
@@ -178,7 +178,7 @@ describe('Member 1 Items React Frontend', () => {
   it('hides Submit button if item status is not Draft', async () => {
     itemsApi.getItem.mockResolvedValue({
       id: '123',
-      title: 'Confirmed Item',
+      title: 'Wooden Study Table',
       status: 'InAssessment', // Not draft
       conditionAnswers: [{ questionText: 'Q1', answer: 'A1' }]
     });
@@ -192,7 +192,7 @@ describe('Member 1 Items React Frontend', () => {
     );
 
     // Wait for load
-    await screen.findByText('Confirmed Item');
+    await screen.findByText('Wooden Study Table');
     
     // Submit button should NOT be in the document
     expect(screen.queryByRole('button', { name: /Submit for Assessment/i })).not.toBeInTheDocument();
@@ -201,7 +201,7 @@ describe('Member 1 Items React Frontend', () => {
   it('shows Submit button if item status is Draft and has condition answers', async () => {
     itemsApi.getItem.mockResolvedValue({
       id: '123',
-      title: 'Draft Item',
+      title: 'Dell Latitude 5420',
       status: 'Draft',
       conditionAnswers: [{ questionText: 'Q1', answer: 'A1' }]
     });
@@ -214,7 +214,7 @@ describe('Member 1 Items React Frontend', () => {
       </MemoryRouter>
     );
 
-    await screen.findByText('Draft Item');
+    await screen.findByText('Dell Latitude 5420');
     expect(screen.getByRole('button', { name: /Submit for Assessment/i })).toBeInTheDocument();
   });
 
@@ -278,7 +278,7 @@ describe('Member 1 Items React Frontend', () => {
   it('displays concurrency alert (409) when updating an item with outdated version', async () => {
     itemsApi.getItem.mockResolvedValue({
       id: '123',
-      title: 'Draft Item',
+      title: 'Dell Latitude 5420',
       category: 'Electronics',
       locationArea: 'Loc',
       status: 'Draft',
@@ -298,7 +298,7 @@ describe('Member 1 Items React Frontend', () => {
     );
 
     // Wait for the form to load
-    await screen.findByDisplayValue('Draft Item');
+    await screen.findByDisplayValue('Dell Latitude 5420');
 
     // Submit the edit form
     fireEvent.click(screen.getByRole('button', { name: /Save Item/i }));
@@ -309,14 +309,19 @@ describe('Member 1 Items React Frontend', () => {
   });
 
   // 5. Condition answer submission
-  it('submits condition answers successfully', async () => {
+  it('submits condition answers successfully and shows feedback', async () => {
     itemsApi.getItem.mockResolvedValue({
       id: '123',
-      title: 'Draft Item',
+      title: 'Dell Latitude 5420',
       status: 'Draft',
     });
     
-    itemsApi.submitConditionAnswers.mockResolvedValue({});
+    // Use a delayed promise to test the "Saving..." state
+    let resolveSubmit;
+    const submitPromise = new Promise(resolve => {
+      resolveSubmit = resolve;
+    });
+    itemsApi.submitConditionAnswers.mockReturnValue(submitPromise);
 
     render(
       <MemoryRouter initialEntries={['/items/123']}>
@@ -326,19 +331,75 @@ describe('Member 1 Items React Frontend', () => {
       </MemoryRouter>
     );
 
-    await screen.findByText('Draft Item');
+    await screen.findByText('Dell Latitude 5420');
 
     // Fill in the static questions
+    const yesLabels = screen.getAllByText('Yes');
+    fireEvent.click(yesLabels[0]);
+    
+    const noLabels = screen.getAllByText('No');
+    fireEvent.click(noLabels[1]);
+
     const textareas = screen.getAllByRole('textbox');
-    // We assume the first two textboxes are the condition answers
-    fireEvent.change(textareas[0], { target: { value: 'Yes, powers on' } });
-    fireEvent.change(textareas[1], { target: { value: 'No damage' } });
+    fireEvent.change(textareas[0], { target: { value: 'powers on fine' } });
+    fireEvent.change(textareas[1], { target: { value: 'no damage' } });
 
-    fireEvent.click(screen.getByRole('button', { name: /Save Answers/i }));
+    const saveButton = screen.getByRole('button', { name: /Save Answers/i });
+    fireEvent.click(saveButton);
 
+    // Verify "Saving..." state
+    expect(screen.getByRole('button', { name: /Saving.../i })).toBeDisabled();
+
+    // Resolve the API call
+    resolveSubmit({});
+
+    // Verify success message
     await waitFor(() => {
       expect(itemsApi.submitConditionAnswers).toHaveBeenCalled();
     });
+    
+    expect(await screen.findByText('Condition answers saved successfully.')).toBeInTheDocument();
+    
+    // Verify button goes back to normal
+    expect(screen.getByRole('button', { name: /Save Answers/i })).toBeEnabled();
+    
+    // Verify values remain bound
+    expect(textareas[0].value).toBe('powers on fine');
+  });
+
+  it('shows error message when condition answers submission fails', async () => {
+    itemsApi.getItem.mockResolvedValue({
+      id: '123',
+      title: 'Dell Latitude 5420',
+      status: 'Draft',
+    });
+    
+    const error = new Error('Failed to save');
+    error.response = { data: { detail: 'API Error Detail' } };
+    itemsApi.submitConditionAnswers.mockRejectedValue(error);
+
+    render(
+      <MemoryRouter initialEntries={['/items/123']}>
+        <Routes>
+          <Route path="/items/:id" element={<ItemDetailsPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await screen.findByText('Dell Latitude 5420');
+
+    const yesLabels = screen.getAllByText('Yes');
+    fireEvent.click(yesLabels[0]);
+    
+    const noLabels = screen.getAllByText('No');
+    fireEvent.click(noLabels[1]);
+
+    const saveButton = screen.getByRole('button', { name: /Save Answers/i });
+    fireEvent.click(saveButton);
+
+    expect(await screen.findByText('API Error Detail')).toBeInTheDocument();
+    expect(screen.queryByText('Condition answers saved successfully.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Save Answers/i })).toBeEnabled();
   });
 
   // 6. Assessment confirmation
@@ -347,7 +408,7 @@ describe('Member 1 Items React Frontend', () => {
 
     itemsApi.getItem.mockResolvedValue({
       id: '123',
-      title: 'Assessed Item',
+      title: 'Samsung Microwave Oven',
       status: 'InAssessment',
       assessments: [
         { id: 'a1', status: 'PendingConfirmation', version: 1 }
@@ -362,7 +423,7 @@ describe('Member 1 Items React Frontend', () => {
       </MemoryRouter>
     );
 
-    await screen.findByText('Assessed Item');
+    await screen.findByText('Samsung Microwave Oven');
 
     fireEvent.click(screen.getByRole('button', { name: /Confirm Assessment/i }));
 
@@ -375,7 +436,7 @@ describe('Member 1 Items React Frontend', () => {
   it('submits an answer to a pending clarification', async () => {
     itemsApi.getItem.mockResolvedValue({
       id: '123',
-      title: 'Assessed Item',
+      title: 'Samsung Microwave Oven',
       status: 'InAssessment',
       assessments: [
         { 
@@ -397,7 +458,7 @@ describe('Member 1 Items React Frontend', () => {
       </MemoryRouter>
     );
 
-    await screen.findByText('Assessed Item');
+    await screen.findByText('Samsung Microwave Oven');
     
     // Find the clarification input
     const input = screen.getByPlaceholderText('Type your detailed answer here...');

@@ -115,51 +115,88 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Version: ${_assessment!.version}', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
-        Text('Status: ${_assessment!.status}', style: const TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text('Confidence: ${(_assessment!.confidence * 100).toStringAsFixed(1)}%'),
-        Text('Date: ${_assessment!.createdAt.toLocal().toString().split('.')[0]}'),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Version: ${_assessment!.version}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF111827))),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(color: Colors.blue.shade100, borderRadius: BorderRadius.circular(12)),
+              child: Text(_assessment!.status, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text('Confidence: ${(_assessment!.confidence * 100).toStringAsFixed(1)}%', style: const TextStyle(color: Color(0xFF4B5563))),
+        Text('Date: ${_assessment!.createdAt.toLocal().toString().split('.')[0]}', style: const TextStyle(color: Color(0xFF4B5563))),
       ],
     );
   }
 
   Widget _buildAIAssessmentSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('AI ASSESSMENT', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.blue)),
-        const SizedBox(height: 8),
-        _buildInfoRow('Suggested Category', _assessment!.suggestedCategory),
-        _buildInfoRow('Condition Grade', _assessment!.conditionGrade),
-        _buildInfoRow('Condition Summary', _assessment!.conditionSummary),
-        _buildInfoRow('Visible Observations', _assessment!.visibleObservations),
-        _buildInfoRow('Missing Information', _assessment!.missingInformation),
-      ],
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF), // blue.shade50
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('🤖', style: TextStyle(fontSize: 24)),
+              const SizedBox(width: 8),
+              const Text('AI OBSERVATIONS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildInfoRow('Suggested Category', _assessment!.suggestedCategory, const Color(0xFF1E3A8A)),
+          _buildInfoRow('Condition Grade', _assessment!.conditionGrade, const Color(0xFF1E3A8A)),
+          _buildInfoRow('Condition Summary', _assessment!.conditionSummary, const Color(0xFF1E3A8A)),
+          _buildInfoRow('Visible Observations', _assessment!.visibleObservations, const Color(0xFF1E3A8A)),
+          _buildInfoRow('Missing Information', _assessment!.missingInformation, const Color(0xFF1E3A8A)),
+        ],
+      ),
     );
   }
 
   Widget _buildOwnerReportedSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('OWNER REPORTED', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.green)),
-        const SizedBox(height: 8),
-        _buildInfoRow('Functionality', _assessment!.ownerReportedFunctionality),
-      ],
-    );
-  }
-
-  Widget _buildInfoRow(String label, String? value) {
-    if (value == null || value.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4), // green.shade50
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.shade200),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
-          Text(value),
+          Row(
+            children: [
+              const Text('👤', style: TextStyle(fontSize: 24)),
+              const SizedBox(width: 8),
+              const Text('OWNER REPORTED', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF065F46))),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildInfoRow('Functionality', _assessment!.ownerReportedFunctionality, const Color(0xFF065F46)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String? value, Color textColor) {
+    if (value == null || value.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label.toUpperCase(), style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: textColor.withOpacity(0.7))),
+          const SizedBox(height: 4),
+          Text(value, style: TextStyle(color: textColor, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -169,18 +206,26 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Clarifications', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
+        const Text('Clarifications', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF111827))),
+        const SizedBox(height: 12),
         if (_assessment!.clarifications.isEmpty)
-          const Text('No clarifications requested.')
+          const Text('No clarifications requested.', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic))
         else
           ..._assessment!.clarifications.map((c) => Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey.shade300),
+                ),
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
-                  title: Text(c.question),
-                  subtitle: Text(c.answer != null && c.answer!.isNotEmpty
-                      ? 'Answer: ${c.answer}'
-                      : 'Status: ${c.status}'),
+                  title: Text(c.question, style: const TextStyle(fontWeight: FontWeight.w500)),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4.0),
+                    child: Text(c.answer != null && c.answer!.isNotEmpty
+                        ? 'Answer: ${c.answer}'
+                        : 'Status: ${c.status}'),
+                  ),
                   trailing: (c.status == 'Pending')
                       ? ElevatedButton(
                           onPressed: () async {
@@ -193,7 +238,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                           },
                           child: const Text('Answer'),
                         )
-                      : null,
+                      : const Icon(Icons.check_circle, color: Colors.green),
                 ),
               )),
       ],
@@ -206,6 +251,12 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981), // emerald-500
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
             onPressed: () async {
               final result = await context.push(
                 '/items/${widget.itemId}/assessments/${widget.assessmentId}/confirm',
@@ -214,10 +265,16 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 _loadAssessment();
               }
             },
-            child: const Text('Review & Confirm Assessment'),
+            child: const Text('✓ Confirm Assessment', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFF59E0B), // amber-500
+              side: const BorderSide(color: Color(0xFFF59E0B)),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
             onPressed: () async {
               final result = await context.push(
                 '/items/${widget.itemId}/assessments/${widget.assessmentId}/reassessment',
@@ -226,7 +283,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 _loadAssessment();
               }
             },
-            child: const Text('Request Reassessment'),
+            child: const Text('↺ Request Reassessment', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
         ],
       );
