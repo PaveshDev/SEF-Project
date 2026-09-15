@@ -19,12 +19,12 @@ public class ItemsController(IItemService itemService) : ControllerBase
         if (Guid.TryParse(claimId, out var id))
             return id;
 
-        // Mock owner for development purposes
-        return Guid.Parse("00000000-0000-0000-0000-000000000001");
+        throw new System.Security.Authentication.AuthenticationException("User identifier claim is missing or invalid.");
     }
 
     private ObjectResult HandleException(Exception ex)
     {
+        Console.WriteLine(ex.ToString());
         return ex switch
         {
             ItemConcurrencyException => Conflict(new ProblemDetails { Status = 409, Title = "Concurrency conflict", Detail = ex.Message }),

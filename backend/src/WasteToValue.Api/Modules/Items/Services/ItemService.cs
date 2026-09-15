@@ -172,7 +172,6 @@ public class ItemService(IItemRepository repository) : IItemService
         {
             item.ConditionAnswers.Add(new ItemConditionAnswer
             {
-                Id = Guid.NewGuid(),
                 ItemId = item.Id,
                 QuestionCode = answerDto.QuestionCode,
                 QuestionText = answerDto.QuestionText,
@@ -184,7 +183,6 @@ public class ItemService(IItemRepository repository) : IItemService
 
         item.UpdatedAt = DateTime.UtcNow;
 
-        repository.Update(item);
         await repository.SaveChangesAsync(cancellationToken);
 
         return item.ConditionAnswers.Select(x => x.ToResponse()).ToList();
