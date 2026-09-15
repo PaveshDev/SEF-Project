@@ -134,8 +134,8 @@ export function ItemDetailsPage() {
             <div>
               {item.conditionAnswers && item.conditionAnswers.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {item.conditionAnswers.map(ans => (
-                    <div key={ans.id} style={{ backgroundColor: '#f9fafb', padding: '1rem', borderRadius: '0.375rem', border: '1px solid #e5e7eb' }}>
+                  {item.conditionAnswers.map((ans, index) => (
+                    <div key={ans.id || index} style={{ backgroundColor: '#f9fafb', padding: '1rem', borderRadius: '0.375rem', border: '1px solid #e5e7eb' }}>
                       <p style={{ margin: '0 0 0.5rem 0', fontWeight: '600', color: '#374151', fontSize: '0.95rem' }}>{ans.questionText}</p>
                       <p style={{ margin: '0', color: '#111827' }}>{ans.answer}</p>
                     </div>

@@ -15,6 +15,7 @@ import 'package:waste_to_value/features/items/screens/assessment_screen.dart';
 import 'package:waste_to_value/features/items/screens/clarification_screen.dart';
 import 'package:waste_to_value/features/items/screens/confirm_assessment_screen.dart';
 import 'package:waste_to_value/features/items/screens/reassessment_screen.dart';
+import 'package:waste_to_value/features/items/screens/add_photo_screen.dart';
 import 'package:waste_to_value/core/network/api_client.dart';
 
 // Simple Mock HttpClientAdapter for Dio
@@ -357,5 +358,37 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(apiCalled, true);
+  });
+
+  testWidgets('14. Add Photo screen handles UI controls', (WidgetTester tester) async {
+    bool apiCalled = false;
+    apiClient.httpClientAdapter = MockDioAdapter((options) async {
+      if (options.path == '/api/items/1/photos' && options.method == 'POST') {
+        apiCalled = true;
+        return ResponseBody.fromString('', 201);
+      }
+      return ResponseBody.fromString('Not Found', 404);
+    });
+
+    final router = GoRouter(
+      initialLocation: '/items/1/add-photo',
+      routes: [
+        GoRoute(
+            path: '/items/:id/add-photo',
+            builder: (context, state) =>
+                AddPhotoScreen(itemId: state.pathParameters['id']!)),
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+
+    // Verify empty state buttons
+    expect(find.text('Take a Photo'), findsOneWidget);
+    expect(find.text('Choose from Gallery'), findsOneWidget);
+    expect(find.text('No photo selected'), findsOneWidget);
+
+    // Ensure apiCalled is referenced if we ever trigger the mock upload.
+    expect(apiCalled, false);
   });
 }
