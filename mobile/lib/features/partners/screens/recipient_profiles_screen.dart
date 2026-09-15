@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import '../services/partners_api_service.dart';
 
 class RecipientProfilesScreen extends StatefulWidget {
   const RecipientProfilesScreen({super.key});

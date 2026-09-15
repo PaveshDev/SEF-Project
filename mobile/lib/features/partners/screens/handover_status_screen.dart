@@ -1,28 +1,44 @@
 import 'package:flutter/material.dart';
+import '../services/partners_api_service.dart';
 
-class HandoverStatusScreen extends StatelessWidget {
+class HandoverStatusScreen extends StatefulWidget {
   const HandoverStatusScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Dummy data for handovers
-    final List<Map<String, dynamic>> dummyHandovers = [
-      {
-        'id': 'ho_101',
-        'itemName': 'Office Desks (20)',
-        'donor': 'Tech Corp Inc.',
-        'status': 'In Transit',
-        'estimatedDelivery': '2026-09-16',
-      },
-      {
-        'id': 'ho_102',
-        'itemName': 'Used Delivery Van',
-        'donor': 'Local Logistics',
-        'status': 'Completed',
-        'estimatedDelivery': '2026-09-10',
-      }
-    ];
+  State<HandoverStatusScreen> createState() => _HandoverStatusScreenState();
+}
 
+class _HandoverStatusScreenState extends State<HandoverStatusScreen> {
+  final PartnersApiService _apiService = PartnersApiService();
+  List<dynamic> _handovers = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHandovers();
+  }
+
+  Future<void> _loadHandovers() async {
+    setState(() => _isLoading = true);
+    try {
+      final handovers = await _apiService.getHandovers();
+      setState(() {
+        _handovers = handovers;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load handovers: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -30,56 +46,78 @@ class HandoverStatusScreen extends StatelessWidget {
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadHandovers,
+          ),
+        ],
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: dummyHandovers.length,
-        itemBuilder: (context, index) {
-          final handover = dummyHandovers[index];
-          final bool isCompleted = handover['status'] == 'Completed';
-
-          return Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _handovers.isEmpty
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        handover['itemName'],
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      _buildStatusChip(handover['status']),
+                      Icon(Icons.local_shipping_outlined, size: 64, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text('No handovers found.', style: TextStyle(fontSize: 18, color: Colors.grey)),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  _buildInfoRow(Icons.business, 'Donor', handover['donor']),
-                  const SizedBox(height: 8),
-                  _buildInfoRow(
-                    isCompleted ? Icons.check_circle : Icons.local_shipping,
-                    isCompleted ? 'Delivered On' : 'Est. Delivery',
-                    handover['estimatedDelivery'],
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadHandovers,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _handovers.length,
+                    itemBuilder: (context, index) {
+                      final handover = _handovers[index];
+                      final bool isCompleted = handover['status'] == 'Completed';
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    handover['itemName'] ?? 'Unknown Item',
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                  ),
+                                  _buildStatusChip(handover['status'] ?? 'Pending'),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              _buildInfoRow(Icons.business, 'Donor', handover['donor'] ?? 'Unknown'),
+                              const SizedBox(height: 8),
+                              _buildInfoRow(
+                                isCompleted ? Icons.check_circle : Icons.local_shipping,
+                                isCompleted ? 'Delivered On' : 'Est. Delivery',
+                                handover['estimatedDelivery'] ?? 'TBD',
+                              ),
+                              if (!isCompleted) ...[
+                                const SizedBox(height: 16),
+                                LinearProgressIndicator(
+                                  value: 0.6, // Placeholder for progress logic
+                                  backgroundColor: Colors.grey[200],
+                                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text('Driver is on the way', style: TextStyle(fontSize: 12, color: Colors.blue)),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                  if (!isCompleted) ...[
-                    const SizedBox(height: 16),
-                    LinearProgressIndicator(
-                      value: 0.6,
-                      backgroundColor: Colors.grey[200],
-                      valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text('Driver is on the way', style: TextStyle(fontSize: 12, color: Colors.blue)),
-                  ],
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+                ),
     );
   }
 
