@@ -225,6 +225,98 @@ public static class DbInitializer
             await context.SaveChangesAsync();
             logger.LogInformation("Seeded {Count} categories", categories.Count);
         }
+
+        // Seed Collection Agents — 2 per Sri Lankan district (idempotent per email)
+        {
+            var districtAgents = new (string District, string Town, string Agent1Name, string Agent1Phone, string Agent2Name, string Agent2Phone)[]
+            {
+                ("Colombo",        "Colombo 03",      "Kasun Perera",         "0771000001", "Nadeesha Silva",        "0771000002"),
+                ("Gampaha",        "Negombo",          "Ruwan Jayawardena",    "0772000001", "Dilini Fernando",       "0772000002"),
+                ("Kalutara",       "Panadura",         "Chamara Bandara",      "0773000001", "Iresha Kumari",         "0773000002"),
+                ("Kandy",          "Peradeniya",       "Nuwan Rathnayake",     "0774000001", "Sachini Weerasinghe",   "0774000002"),
+                ("Matale",         "Dambulla",         "Tharindu Herath",      "0775000001", "Kumari Dissanayake",    "0775000002"),
+                ("Nuwara Eliya",   "Hatton",           "Saman Wijesinghe",     "0776000001", "Ruwanthi Perera",       "0776000002"),
+                ("Galle",          "Galle Fort",       "Lakmal de Silva",      "0777000001", "Harshani Gunasekara",   "0777000002"),
+                ("Matara",         "Weligama",         "Prasad Wickramasinghe","0778000001", "Nimesha Ranasinghe",    "0778000002"),
+                ("Hambantota",     "Tangalle",         "Asanka Rajapaksha",    "0779000001", "Sanduni Jayasuriya",    "0779000002"),
+                ("Jaffna",         "Nallur",           "Kumaran Selvarajah",   "0710000001", "Thushara Nadarajah",    "0710000002"),
+                ("Kilinochchi",    "Kilinochchi Town", "Pradeep Rajaratnam",   "0711000001", "Kavitha Shanmuganathan","0711000002"),
+                ("Mannar",         "Mannar Town",      "Dinesh Kumaraswamy",   "0712000001", "Malini Thirunavukkarasu","0712000002"),
+                ("Vavuniya",       "Vavuniya Town",    "Suresh Pathmanathan",  "0713000001", "Deepa Sivanesanathan",  "0713000002"),
+                ("Mullaitivu",     "Mullaitivu Town",  "Arun Ganeshalingam",   "0714000001", "Priya Balachandran",    "0714000002"),
+                ("Batticaloa",     "Batticaloa Town",  "Ramesh Yogarajah",     "0715000001", "Shamila Muralitharan",  "0715000002"),
+                ("Ampara",         "Kalmunai",         "Mohamed Farook",       "0716000001", "Fathima Rizna",         "0716000002"),
+                ("Trincomalee",    "Trincomalee Town", "Kamal Jeyaratnam",     "0717000001", "Nishanthi Wickremaratne","0717000002"),
+                ("Kurunegala",     "Kurunegala Town",  "Ajith Samaraweera",    "0718000001", "Gayani Ekanayake",      "0718000002"),
+                ("Puttalam",       "Chilaw",           "Isuru Seneviratne",    "0719000001", "Chathurika Amarasinghe","0719000002"),
+                ("Anuradhapura",   "Anuradhapura Town","Mahesh Liyanage",      "0720000001", "Nadeeka Karunaratne",   "0720000002"),
+                ("Polonnaruwa",    "Kaduruwela",       "Lasantha Gunawardena", "0721000001", "Hiruni Samarasekara",   "0721000002"),
+                ("Badulla",        "Bandarawela",      "Chathura Madushan",    "0722000001", "Sewwandi Abeysinghe",   "0722000002"),
+                ("Monaragala",     "Wellawaya",        "Dilan Priyankara",     "0723000001", "Anusha Madushani",      "0723000002"),
+                ("Ratnapura",      "Ratnapura Town",   "Sampath Wimalasena",   "0724000001", "Thilini Jayaweera",     "0724000002"),
+                ("Kegalle",        "Mawanella",        "Indika Pathirana",     "0725000001", "Nethmi Gunatilake",     "0725000002"),
+            };
+
+            int seededAgentCount = 0;
+            foreach (var (district, town, agent1Name, agent1Phone, agent2Name, agent2Phone) in districtAgents)
+            {
+                var agents = new[]
+                {
+                    (Name: agent1Name, Phone: agent1Phone, Index: 1),
+                    (Name: agent2Name, Phone: agent2Phone, Index: 2),
+                };
+
+                foreach (var agent in agents)
+                {
+                    var emailSlug = agent.Name.ToLowerInvariant().Replace(" ", ".").Replace("'", "");
+                    var email = $"{emailSlug}@loopworth.local";
+                    var existingUser = await userManager.FindByEmailAsync(email);
+                    if (existingUser != null) continue;
+
+                    var user = new ApplicationUser
+                    {
+                        UserName = email,
+                        Email = email,
+                        FullName = agent.Name,
+                        PhoneNumber = agent.Phone,
+                        PhoneNumberConfirmed = true,
+                        EmailConfirmed = true,
+                        District = district,
+                        Town = town
+                    };
+
+                    var result = await userManager.CreateAsync(user, "Agent123!");
+                    if (!result.Succeeded)
+                    {
+                        logger.LogWarning("Failed to seed collection agent {Email}: {Errors}",
+                            email, string.Join(", ", result.Errors.Select(e => e.Description)));
+                        continue;
+                    }
+
+                    await userManager.AddToRoleAsync(user, "CollectionAgent");
+
+                    var profile = new CollectionAgentProfile
+                    {
+                        UserId = user.Id,
+                        Phone = agent.Phone,
+                        ServiceArea = district,
+                        TownArea = town,
+                        IsAvailable = true,
+                        IsActive = true
+                    };
+
+                    context.CollectionAgentProfiles.Add(profile);
+                    seededAgentCount++;
+                }
+            }
+
+            if (seededAgentCount > 0)
+            {
+                await context.SaveChangesAsync();
+                logger.LogInformation("Seeded {Count} collection agents across {Districts} districts",
+                    seededAgentCount, districtAgents.Length);
+            }
+        }
     }
 }
 
