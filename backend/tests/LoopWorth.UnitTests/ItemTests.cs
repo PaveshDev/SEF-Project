@@ -125,4 +125,29 @@ public class ItemTests
         Assert.Contains("Description Inconsistency", result.MismatchReason);
         Assert.Contains("edit the item's condition description", result.MismatchReason, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task ItemAssessmentAgent_PassesCategoryConsistency_WhenPhoneDescriptionMentionsMotherboardAndLogicModules()
+    {
+        var configuration = new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build();
+        var logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<LoopWorth.Infrastructure.Agents.ItemAssessmentAgent>.Instance;
+        var agent = new LoopWorth.Infrastructure.Agents.ItemAssessmentAgent(new HttpClient(), configuration, logger);
+
+        var item = new Item
+        {
+            Name = "Iphone 13 Pro max",
+            Brand = "Apple",
+            Model = "iphone 13 pro max",
+            Category = new Category { Name = "Phone" },
+            ConditionDescription = "This iPhone 13 Pro Max holds fair salvage value for repair technicians or buyers looking for a project, primarily anchored by the enduring performance of its A15 Bionic motherboard, internal logic modules, and front Super Retina XDR display (if undamaged). However, with severe structural damage exposing the charging coil and camera brackets, zero water resistance, and a multi-year degraded battery, the required repair investment-a rear housing/glass replacement plus a new battery-"
+        };
+
+        var result = await agent.AssessItemAsync(item);
+
+        Assert.True(result.IsCategoryMatch);
+        Assert.Null(result.MismatchReason);
+        Assert.Equal(ConditionLevel.Poor, result.ConditionLevel);
+        Assert.Equal(RecoveryRoute.Recycle, result.RecommendedRoute);
+    }
 }
+
