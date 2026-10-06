@@ -140,7 +140,9 @@ Do not include any text outside the JSON object.";
             var hasHazard = item.EcoHazardLevel is "High" or "Critical" or "Moderate" ||
                             (item.EcoHazardReportJson != null && item.EcoHazardReportJson.Contains("\"IsHarmfulToEnvironment\":true")) ||
                             desc.Contains("swollen") || desc.Contains("leak") || desc.Contains("puncture");
-            var isDamaged = hasHazard || desc.Contains("crack") || desc.Contains("broken") || desc.Contains("sluggish") || desc.Contains("degraded") || desc.Contains("outweigh");
+            var isDamaged = hasHazard || desc.Contains("crack") || desc.Contains("broken") || desc.Contains("sluggish") ||
+                            desc.Contains("degraded") || desc.Contains("outweigh") || desc.Contains("damage") ||
+                            desc.Contains("salvage") || desc.Contains("shattered");
             var isGood = !hasHazard && (desc.Contains("mint") || desc.Contains("good") || desc.Contains("working") || desc.Contains("like new"));
 
             var condition = isDamaged ? ConditionLevel.Poor : (isGood ? ConditionLevel.Good : ConditionLevel.Fair);
@@ -207,11 +209,19 @@ Do not include any text outside the JSON object.";
                                identityText.Contains("surface go") || identityText.Contains("tablet");
 
         // 2. Determine description device indicators
-        var descIsPhone = descText.Contains("iphone") || descText.Contains("smartphone") || descText.Contains("cell phone") || descText.Contains("sim tray") || descText.Contains("mobile phone");
+        var descIsPhone = descText.Contains("iphone") || descText.Contains("smartphone") || descText.Contains("cell phone") ||
+                          descText.Contains("sim tray") || descText.Contains("mobile phone") || descText.Contains("galaxy s") ||
+                          descText.Contains("galaxy z") || descText.Contains("pixel") || descText.Contains("redmi") ||
+                          descText.Contains("oneplus") || descText.Contains("super retina") || descText.Contains("magsafe") ||
+                          (!string.IsNullOrWhiteSpace(item.Name) && identityIsPhone && descText.Contains(item.Name.ToLowerInvariant())) ||
+                          (!string.IsNullOrWhiteSpace(item.Model) && identityIsPhone && descText.Contains(item.Model.ToLowerInvariant()));
+
         var descIsLaptop = descText.Contains("macbook") || descText.Contains("thinkpad") || descText.Contains("zenbook") ||
                            descText.Contains("laptop") || descText.Contains("notebook") || descText.Contains("chromebook") ||
-                           descText.Contains("chassis overhaul") || descText.Contains("tuf") || descText.Contains("cooling array") ||
-                           descText.Contains("cooling fan") || descText.Contains("heat pipe") || descText.Contains("motherboard");
+                           descText.Contains("chassis overhaul") || descText.Contains("tuf") || descText.Contains("gaming laptop") ||
+                           (!string.IsNullOrWhiteSpace(item.Name) && identityIsLaptop && descText.Contains(item.Name.ToLowerInvariant())) ||
+                           (!string.IsNullOrWhiteSpace(item.Model) && identityIsLaptop && descText.Contains(item.Model.ToLowerInvariant()));
+
         var descIsTablet = descText.Contains("ipad") || descText.Contains("tablet") || descText.Contains("stylus pen");
 
         // Effective indicators: device identity OR description mentions (unless conflicting)
@@ -225,26 +235,27 @@ Do not include any text outside the JSON object.";
         var isCatTablet = categoryName.Equals("Tablet", StringComparison.OrdinalIgnoreCase);
 
         // --- SCENARIO 2: Description Inconsistency (Identity matches Category, but Description contradicts it!) ---
-        if (identityIsPhone && isCatPhone && descIsLaptop)
+        if (identityIsPhone && isCatPhone && descIsLaptop && !descIsPhone)
         {
             var detectedMention = descText.Contains("zenbook") ? "ASUS Zenbook laptop" : (descText.Contains("tuf") ? "ASUS TUF laptop" : "laptop");
+            var article = detectedMention.StartsWith("a", StringComparison.OrdinalIgnoreCase) ? "an" : "a";
             return (false, "Phone",
-                $"Description Inconsistency: '{item.Name}' is categorized correctly as a Phone, but the condition description appears to describe an {detectedMention} instead of your phone. Please edit the item's condition description to accurately describe your {item.Name}.",
+                $"Description Inconsistency: '{item.Name}' is categorized correctly as a Phone, but the condition description appears to describe {article} {detectedMention} instead of your phone. Please edit the item's condition description to accurately describe your {item.Name}.",
                 "DescriptionMismatch");
         }
 
-        if (identityIsLaptop && isCatLaptop && descIsPhone)
+        if (identityIsLaptop && isCatLaptop && descIsPhone && !descIsLaptop)
         {
             return (false, "Laptop",
                 $"Description Inconsistency: '{item.Name}' is categorized correctly as a Laptop, but the condition description appears to describe a phone instead of your laptop. Please edit the item's condition description to accurately describe your {item.Name}.",
                 "DescriptionMismatch");
         }
 
-        if (identityIsTablet && isCatTablet && (descIsLaptop || descIsPhone))
+        if (identityIsTablet && isCatTablet && ((descIsLaptop && !descIsTablet) || (descIsPhone && !descIsTablet)))
         {
             var deviceMention = descIsLaptop ? "laptop" : "phone";
             return (false, "Tablet",
-                $"Description Inconsistency: '{item.Name}' is categorized correctly as a Tablet, but the condition description appears to describe a {deviceMention}. Please edit the item's condition description to accurately describe your {item.Name}.",
+                $"Description Inconsistency: '{item.Name}' is categorized correctly as a Tablet, but the condition description appears to describe a {deviceMention} instead of your tablet. Please edit the item's condition description to accurately describe your {item.Name}.",
                 "DescriptionMismatch");
         }
 
